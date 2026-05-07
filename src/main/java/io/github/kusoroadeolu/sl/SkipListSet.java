@@ -175,7 +175,7 @@ public class SkipListSet<T extends Comparable<T>> implements Set<T> {
         Node<T> curr =  head.nodes()[0].next();
         int i = 0;
         while (curr != null) {
-            o[i] = curr.value;
+            o[i++] = curr.value;
             curr = curr.next();
         }
 
@@ -215,8 +215,21 @@ public class SkipListSet<T extends Comparable<T>> implements Set<T> {
 
     @Override
     public boolean retainAll(Collection<?> c) {
-        clear();
-        return addAll((Collection<? extends T>) c);
+        if (size == 0) return false;
+        var set = new HashSet<>(c);
+        Node<T> curr = head.nodes()[0].next();
+        boolean all = true;
+
+        while (curr != null) {
+            var next = curr.next(); //Store next before trying to remove curr
+            var v = curr.value;
+            if (!set.contains(v)) {
+                 if(!remove(v)) all = false;
+            }
+            curr = next;
+        }
+
+        return all;
     }
 
     @Override
