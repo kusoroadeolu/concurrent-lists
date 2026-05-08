@@ -6,20 +6,34 @@ import java.util.*;
 
 /// ## SkipListSet
 ///
-/// ### Description
-/// An ordered unbounded skip list set of comparable values. This class implements the Set interface and upholds its invariants.
+/// An ordered, unbounded skip list implementation of the [java.util.Set] interface.
+/// All elements must implement [Comparable] and are maintained in ascending natural order.
+/// Duplicate elements are not permitted, consistent with [Set] invariants.
 ///
+/// ## Implementation
 ///
-/// ### Implementation
-/// This class contains a doubly linked list of nodes up to a height (h). Ideally, we'd use a singly linked list, but to allow for easier linking / unlinking of nodes during {@link Set#add(Object)} and {@link Set#remove(Object)} operations
-/// Each node class contains an array of their nodes at each level (including theirs).
-/// This set is initialized with a sentinel head node which contains nodes at each level (up to a height h) to allow for easier traversal of each level.
+/// Internally, this structure maintains a tower of doubly linked node lists spanning
+/// levels `0` through `h-1`, where level `0` is the base list containing all elements.
+/// Higher levels act as express lanes, allowing traversal to skip over large portions
+/// of the list.
 ///
-/// This list is zero index based. Lowest level at zero and higher levels at > 0
+/// A sentinel head node spans all levels and serves as the fixed entry point for
+/// traversal, eliminating boundary edge cases during search and mutation. Each node
+/// holds an array of forward pointers, one per level it participates in, enabling
+/// efficient multi-level linking and unlinking during [Set#add] and [Set#remove] operations.
 ///
+/// Doubly linked pointers are maintained to simplify node removal, avoiding the need
+/// to track a separate predecessor reference during unlinking.
 ///
-/// **NOTE:** This class does not support iterators
+/// ## Performance
 ///
+/// | Operation   | Expected    |
+/// |-------------|-------------|
+/// | `add`       | O(n)        |
+/// | `remove`    | O(log n)    |
+/// | `contains`  | O(log n)    |
+///
+/// @param <T> the type of elements held in this set; must implement [Comparable]
 @SuppressWarnings("unchecked")
 public class SkipListSet<T extends Comparable<T>> implements Set<T> {
     private final Node<T> head;
@@ -28,7 +42,7 @@ public class SkipListSet<T extends Comparable<T>> implements Set<T> {
     private int size;
 
     public SkipListSet(int height) {
-        this.head = fillTo(null, height);
+        this.head = fillHead(height);
         this.random = new Random();
         this.height = height;
 
@@ -190,7 +204,7 @@ public class SkipListSet<T extends Comparable<T>> implements Set<T> {
         int i = 0;
         Node<T> curr =  head.nodes()[0].next();
         while (curr != null) {
-            a[i] = (T1) curr.value;
+            a[i++] = (T1) curr.value;
             curr = curr.next();
         }
 
@@ -205,12 +219,12 @@ public class SkipListSet<T extends Comparable<T>> implements Set<T> {
 
     @Override
     public boolean addAll(Collection<? extends T> c) {
-        boolean all = true;
+        int count = 0;
         for (T t : c) {
-             if(!add(t)) all = false;
+             if(add(t)) count++;
         }
 
-        return all;
+        return count > 0;
     }
 
     @Override
@@ -258,7 +272,7 @@ public class SkipListSet<T extends Comparable<T>> implements Set<T> {
 
     @Override
     public Iterator<T> iterator() {
-        throw new UnsupportedOperationException();
+        return new ListIterator<>(this);
     }
 
 
@@ -306,18 +320,45 @@ public class SkipListSet<T extends Comparable<T>> implements Set<T> {
         return nodes[0];
     }
 
-    Node<T> fillHead(T value, int height) {
+    Node<T> fillHead(int height) {
         HeadNode<T>[] nodes = new HeadNode[height];
         assert height > 0;
         for (int i = 0; i < height; ++i) {
-            nodes[i] = new HeadNode<>(value, nodes);
+            nodes[i] = new HeadNode<>(null, nodes);
         }
 
         return nodes[0];
     }
 
+    static class ListIterator<T extends Comparable<T>> implements Iterator<T> {
+
+        private final ArrayList<T> list;
+        private int i;
+
+        public ListIterator(SkipListSet<T> set) {
+            list = new ArrayList<>(set.size);
+            var n = set.head.next();
+            while (n != null) {
+                list.add(n.value);
+                n = n.next();
+            }
+        }
+
+        @Override
+        public boolean hasNext() {
+            return i < list.size();
+        }
+
+        @Override
+        public T next() {
+            return list.get(i++);
+        }
+
+
+    }
+
     static class Node<T extends Comparable<T>> {
-        final Node<T>[] nodes;
+        Node<T>[] nodes;
         Node<T> next; //Next of the node on this level
         Node<T> prev; //Prev of the node on this level
         final T value;
@@ -356,8 +397,8 @@ public class SkipListSet<T extends Comparable<T>> implements Set<T> {
         }
 
         @Override
-        public void setNext(Node<T> next) {
-            throw new UnsupportedOperationException("head#next == null");
+        public void setPrev(Node<T> prev) {
+            throw new UnsupportedOperationException("head#prev == null");
         }
     }
 
