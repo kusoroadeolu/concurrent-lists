@@ -181,16 +181,14 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
         }
     }
 
-    //Here we want to copy the node we find, though it adds more object creation overhead, it ensures we get a consistent snapshot of the node while we're inspecting it
     public boolean contains(Object o) {
         T t = (T) o;
         Node<T>[] preds = this.preds.get();
         Node<T>[] succs = this.succs.get();
         int lFound = findNode(preds, succs, new SearchNode<>(t), Operation.CONTAINS);
         if (lFound == -1) return false;
-        IO.println("Found: " + succs[lFound].v);
-        var copy = succs[lFound].copy();
-        return copy.fullyLinked && !copy.marked;
+        var copy = succs[lFound];
+        return copy.loFullyLinked() && !copy.loMarked();
     }
 
 
@@ -235,22 +233,17 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
         return found;
     }
 
+    public int size(){
+        return (int) SIZE.getVolatile(this);
+    }
+
+
     private int generateLevel() {
         double r = ThreadLocalRandom.current().nextDouble();
         int level = (int)(Math.log(r) / Math.log(PROBABILITY)) + 1;
         return Math.min(level, height);
     }
 
-
-    static class CopyNode {
-        final boolean fullyLinked;
-        final boolean marked;
-
-        public CopyNode(boolean fullyLinked, boolean marked) {
-            this.fullyLinked = fullyLinked;
-            this.marked = marked;
-        }
-    }
 
     static class Node<T extends Comparable<T>> {
         final T v;
@@ -272,10 +265,6 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
             this.height = height;
             this.nexts = new Node[height];
             this.lock = lock;
-        }
-
-        CopyNode copy(){
-            return new CopyNode(fullyLinked, marked);
         }
 
         void lock(){
@@ -394,10 +383,10 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
     }
 
     void increment() {
-        SIZE.setVolatile(this, 1);
+        SIZE.getAndAdd(this, 1);
     }
 
     void decrement(){
-        SIZE.setVolatile(this, -1);
+        SIZE.getAndAdd(this, -1);
     }
 }
