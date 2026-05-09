@@ -2,8 +2,12 @@ package io.github.kusoroadeolu.sl;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -29,16 +33,41 @@ import java.util.concurrent.locks.ReentrantLock;
 *
 * To prevent deadlocks, across all operations which need a lock, locks are acquired from the highest layer to the lowest layer and released in the opposite manner
 *
-* Accesses to MARKED/FULLY_LINKED USE set_release/get_acquire mode. Concrete arguments could be made on the usage of opaque modes though.
+* Accesses to MARKED/FULLY_LINKED USE set_release/get_acquire mode.
+*
+* Some Implementation Details not included in the paper:
+* 1. We use a node#value.compareTo(anotherNode) == 0 to indicate if a node is a duplicate in the set.
+*  While this violates the Set contract, good reasons are proposed for it. Using a Object.equals() check incurs overhead.
+* Under sequential constraints, this overhead might seems negligible, however in a tight loop, under high concurrency, this overhead adds up significantly.
+* Through profiling, I discovered only the equality check took 4000 cpu samples. An object.equals to check involves around 4 operations needed by the JVM to ascertain equality, these include:
+*   A virtual method dispatch
+    An instanceof check inside equals()
+    Unboxing the wrapped int value
+    Then the actual comparison
+* By shifting our equality comparison from the equals contract to the compare to contract, the JVM now only has to execute a single equality instruction
+*
+* This change dropped the CPU samples used in that hotpath from 4000 to approx. 1500 samples. A 70% drop, and our thrpt improved thereabout.
+*
+* 2. Profile data also shows that unnecessary time is spent at the max height even when the max height hasn't been reached yet.
+* To prevent starting from the max height redundantly everytime,
+* We keep track of the max height every node has visited and we start from there. There's a case where a node with the curr max height can be removed, we accept the trade-off to prevent unnecessary complexity.
+* We use an ACQUIRE mode for reads on to ensure immediate visibility while cas'ing as we don't want to waste time spinning on stale data.
+* On the add side, we store a local variable which is constantly updated to prevent an extra acquire read after we've broken out of the cas loop. Though this is merely an optimization
+*
+* 3. Search Node and Lazy Node creation Optimization .... coming soon
 * */
+/**
+ * @author kusoroadeolu
+ * */
 @SuppressWarnings("unchecked")
-public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
+public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> implements Set<T> {
     private final Node<T> left;
     private final Node<T> right;
     private final int height;
-    private volatile int size;
+    private final LongAdder size;
     private final ThreadLocal<Node<T>[]> preds;
     private final ThreadLocal<Node<T>[]> succs;
+    private volatile int chl; //Current highest level used by the findNode method to avoid traversing from the max height every iteration
     private static final double PROBABILITY = 0.5;
 
     public OptimisticConcurrentSkipListSet(int height) {
@@ -47,6 +76,7 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
         this.height = height;
         this.preds = ThreadLocal.withInitial(() -> new Node[height]);
         this.succs = ThreadLocal.withInitial(() -> new Node[height]);
+        this.size = new LongAdder();
         linkLeftRight();
     }
 
@@ -58,15 +88,34 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
         }
     }
 
+    int loCurrentMaxLevel(){
+        return (int) CHL.getAcquire(this); //acquire
+    }
+
+
+    boolean casCurrMl(int seen, int ml) {
+        return CHL.compareAndSet(this, seen, ml);
+    }
+
     public boolean add(T t) {
         Objects.requireNonNull(t);
         int maxLevel = generateLevel();
-        int h = height;
+
+        int seenMaxLevel;
+        while (true){
+            seenMaxLevel = loCurrentMaxLevel(); //We need instant visibility here to prevent stale reads however,
+            if (maxLevel <= seenMaxLevel) break;
+            if (casCurrMl(seenMaxLevel, maxLevel)) {
+                seenMaxLevel = maxLevel;
+                break;
+            }
+        }
+
         Node<T> node = new Node<>(t, maxLevel);
         Node<T>[] preds = this.preds.get();
         Node<T>[] succs = this.succs.get();
         outer: while (true) {
-            int lFound = findNode(preds, succs, node, Operation.ADD);
+            int lFound = findNode(preds, succs, seenMaxLevel ,node, Operation.ADD);
             if (lFound != -1) { //If we actually found a node
                 Node<T> seen = succs[lFound];
                 var marked = seen.loMarked();
@@ -112,16 +161,6 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
         }
     }
 
-    boolean validate(Node<T> pred, Node<T> succ, int layer) {
-       return !pred.loMarked() && !succ.loMarked() && pred.nextAt(layer) == succ;
-    }
-
-    //Here succ can be marked, ideally if succ is marked for deletion, its needs to obtain its pred node, which is us, so as long as we hold our node, succ cannot change
-    //When succ eventually holds the node, it will be visible we are dead and restart
-    boolean weakValidate(Node<T> pred, Node<T> succ, int layer) {
-        return !pred.loMarked() && pred.nextAt(layer) == succ;
-    }
-
     public boolean remove(Object o) {
         Objects.requireNonNull(o);
         Node<T>[] preds = this.preds.get();
@@ -129,7 +168,7 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
         Node<T> dummy = new SearchNode<>((T) o);
         boolean isMarked = false;
         outer: while (true) {
-            int lFound = findNode(preds, succs, dummy, Operation.REMOVE);
+            int lFound = findNode(preds, succs, loCurrentMaxLevel() ,dummy, Operation.REMOVE);
             if (lFound == -1) return false; //No node found
 
             Node<T> node = succs[lFound];
@@ -163,7 +202,7 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
                     }
 
 
-                    //Splice from max level
+                    //Splice from max level downwards
                     for (int layer = maxLevel - 1; layer >= 0; --layer) {
                         pred = preds[layer];
                         pred.setNextAt(layer, node.nextAt(layer));
@@ -181,14 +220,68 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
         }
     }
 
+    public boolean isEmpty() {
+        return size() == 0;
+    }
+
     public boolean contains(Object o) {
         T t = (T) o;
         Node<T>[] preds = this.preds.get();
         Node<T>[] succs = this.succs.get();
-        int lFound = findNode(preds, succs, new SearchNode<>(t), Operation.CONTAINS);
+        int lFound = findNode(preds, succs, loCurrentMaxLevel() ,new SearchNode<>(t), Operation.CONTAINS);
         if (lFound == -1) return false;
-        var copy = succs[lFound];
-        return copy.loFullyLinked() && !copy.loMarked();
+        var node = succs[lFound];
+        return node.loFullyLinked() && !node.loMarked();
+    }
+
+    @Override
+    public Iterator<T> iterator() {
+        return null;
+    }
+
+    @Override
+    public Object[] toArray() {
+        return new Object[0];
+    }
+
+    @Override
+    public <T1> T1[] toArray(T1[] a) {
+        return null;
+    }
+
+    @Override
+    public boolean containsAll( Collection<?> c) {
+        return false;
+    }
+
+    @Override
+    public boolean addAll(Collection<? extends T> c) {
+        return false;
+    }
+
+    @Override
+    public boolean retainAll(Collection<?> c) {
+        return false;
+    }
+
+    @Override
+    public boolean removeAll(Collection<?> c) {
+        return false;
+    }
+
+    @Override
+    public void clear() {
+
+    }
+
+    boolean validate(Node<T> pred, Node<T> succ, int layer) {
+        return !pred.loMarked() && !succ.loMarked() && pred.nextAt(layer) == succ;
+    }
+
+    //Here succ can be marked, ideally if succ is marked for deletion, its needs to obtain its pred node, which is us, so as long as we hold our node, succ cannot change
+    //When succ eventually holds the node, it will be visible we are dead and restart
+    boolean weakValidate(Node<T> pred, Node<T> succ, int layer) {
+        return !pred.loMarked() && pred.nextAt(layer) == succ;
     }
 
 
@@ -207,21 +300,22 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
         return node.loFullyLinked() && !node.loMarked() && (node.height - 1) == maxLevel;
     }
 
-    int findNode(Node<T>[] preds, Node<T>[] succs, Node<T> node, Operation op) {
+    int findNode(Node<T>[] preds, Node<T>[] succs, int seen ,Node<T> node, Operation op) {
         int found = -1;
         Node<T> pred = left;
         var r = right;
-        for (int layer = height - 1; layer >= 0; --layer) {
+        for (int layer = seen; layer >= 0; --layer) {
             Node<T> curr = pred.nextAt(layer);
-            while (curr != r && node.compareTo(curr) > 0){
+            int comp;
+            while ((comp = compare(node, curr, r)) > 0){
                 pred = curr; curr = pred.nextAt(layer);
             }
 
-            if (found == - 1 && Objects.equals(node.v, curr.v)) {
+            if (found == -1 && comp == 0) {
                 if (op == Operation.ADD || op == Operation.CONTAINS) {
                     preds[layer] = pred;
                     succs[layer] = curr;
-                    return layer; //End
+                    return layer;
                 }
                 found = layer;
             }
@@ -233,8 +327,14 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
         return found;
     }
 
+    int compare(Node<T> node, Node<T> curr, Node<T> r) {
+        if (curr == r) return -1;       // right sentinel, stop
+        if (curr == left) return 1;     // left sentinel, keep going (shouldn't really happen)
+        return node.compareTo(curr);
+    }
+
     public int size(){
-        return (int) SIZE.getVolatile(this);
+        return size.intValue();
     }
 
 
@@ -305,9 +405,7 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
         }
 
         int compareTo(Node<T> other){
-            if (other instanceof OptimisticConcurrentSkipListSet.LeftNode<T>) return 1; //Left sentinel node
-            else if (other instanceof OptimisticConcurrentSkipListSet.RightNode<T>) return -1; //Right sentinel node
-            else return v.compareTo(other.v);
+            return v.compareTo(other.v);
         }
 
         @Override
@@ -354,7 +452,7 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
             Node<T> curr = left.nextAt(i);
             while (curr != right) {
                 sb.append(curr);
-                if (curr.nextAt(i) != right)sb.append(", ");
+                if (curr.nextAt(i) != right) sb.append(", ");
                 curr = curr.nextAt(i);
             }
             sb.append('\n');
@@ -365,12 +463,12 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
 
     private static final VarHandle FULLY_LINKED;
     private static final VarHandle MARKED;
-    private static final VarHandle SIZE;
+    private static final VarHandle CHL;
 
     static {
         var l = MethodHandles.lookup();
         try {
-            SIZE = l.findVarHandle(OptimisticConcurrentSkipListSet.class, "size", int.class);
+            CHL = l.findVarHandle(OptimisticConcurrentSkipListSet.class, "chl", int.class);
             FULLY_LINKED = l.findVarHandle(Node.class, "fullyLinked", boolean.class);
             MARKED = l.findVarHandle(Node.class, "marked", boolean.class);
         }catch (ReflectiveOperationException e) {
@@ -383,10 +481,10 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> {
     }
 
     void increment() {
-        SIZE.getAndAdd(this, 1);
+        size.increment();
     }
 
     void decrement(){
-        SIZE.getAndAdd(this, -1);
+        size.decrement();
     }
 }

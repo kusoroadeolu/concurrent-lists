@@ -6,7 +6,7 @@ import java.util.*;
 
 /// ## SkipListSet
 ///
-/// An ordered, unbounded skip list implementation of the [java.util.Set] interface.
+/// An ordered, unbounded skip list implementation of the [Set] interface.
 /// All elements must implement [Comparable] and are maintained in ascending natural order.
 /// Duplicate elements are not permitted, consistent with [Set] invariants.
 ///
