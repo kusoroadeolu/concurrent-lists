@@ -1,7 +1,6 @@
 package io.github.kusoroadeolu.sl.jmh;
 
-import io.github.kusoroadeolu.sl.FineGrainedSkipList;
-import io.github.kusoroadeolu.sl.OptimisticConcurrentSkipListSet;
+import io.github.kusoroadeolu.sl.ConcurrentOrderedLinkedList;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.profile.JavaFlightRecorderProfiler;
@@ -10,7 +9,6 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 import java.util.Set;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 @BenchmarkMode(Mode.Throughput)
@@ -75,7 +73,7 @@ public class SkipListBench {
 //            default -> throw new IllegalArgumentException();
 //        };
 
-        set = new OptimisticConcurrentSkipListSet<>(124);
+        set = new ConcurrentOrderedLinkedList<>();
     }
 
     @Threads(2)

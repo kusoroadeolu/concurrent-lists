@@ -2,6 +2,10 @@ package io.github.kusoroadeolu.sl;
 
 import org.openjdk.jcstress.annotations.*;
 import org.openjdk.jcstress.infra.results.I_Result;
+import org.openjdk.jcstress.infra.results.Z_Result;
+
+import java.util.List;
+import java.util.stream.IntStream;
 
 public class ListStress {
 
@@ -77,6 +81,41 @@ public class ListStress {
             }else if (set.size() == 2 && !set.contains(2)){
                 r.r1 = 1; //W
             }
+        }
+    }
+
+    @JCStressTest
+    @Outcome(id = "true", expect = Expect.ACCEPTABLE, desc = "List is sorted")
+    @Outcome(id = "false", expect = Expect.FORBIDDEN, desc = "List is unsorted")
+    @State
+    public static class ConcurrentOrderedListTest {
+
+        private final ConcurrentOrderedLinkedList<Integer> list = new ConcurrentOrderedLinkedList<>();
+
+        @Actor
+        public void actor1() {
+            list.add(1);
+            list.add(3);
+            list.add(5);
+        }
+
+        @Actor
+        public void actor2() {
+            list.add(2);
+            list.add(4);
+        }
+
+        @Actor
+        public void actor3() {
+            list.remove(2);
+            list.remove(4);
+        }
+
+        @Arbiter
+        public void arbiter(Z_Result r) {
+            List<Integer> ls = list.toList();
+            r.r1 = IntStream.range(0, ls.size() - 1)
+                    .allMatch(i -> ls.get(i) <= ls.get(i + 1));
         }
     }
 

@@ -3,24 +3,39 @@ package io.github.kusoroadeolu.sl;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
 
 //A lock free ordered linked singly linked list set
 // States - marked (linearization point for removal), null key (means the pred node has been logically fully deleted)
 // While I'd build a skip list, the ordering of each level of a linked list in a skip list is the meatier problem, so i'll just save myself all the extra work and build the linked list instead
 // The next node ideas were borrowed from fraser's linked thesis and the JDK Skip list map
-// Ideally i'd make a skip list but the hardest part is in this linked list i built, you just have to use this linked list at every level honestly
+
+// ADD
+// A node can be said to be inserted when it successfully when it successfully performs a CAS on a node whose value is less than it,
+// if a node's value is equal to t and the node is not marked as deleted, we return false
+// On cas failure, a thread retries, moving its next pointer to the new next variable
+// If a next pointer indicates a pred node has been deleted, we retry from the left of the list (which is pretty expensive, but we cant move backwards in this list)
+
+// DELETES
+// A node can be said to be deleted if we find an unmarked node equal to T, and we try CAS it to be marked as deleted
+// If we don't succeed the cas we retry as another thread could've added a new unmarked node, returning false if we fail to find a new node
+// We then try to cas pred.next to the next, if we fail, we continue from outer and try to help other threads going through deletion
+// During helping we ensure pred is always on an unmarked node while moving curr to the closest unmarked node from curr,
+// if pred is ever marked,  we reset pred to left and curr to left.next
+// We exit the loop when pred // curr = right
+
+
 public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements ConcurrentListSet<T>{
     private final Node<T> left;
     private final Node<T> right;
     private final LongAdder size;
 
     public ConcurrentOrderedLinkedList() {
-        var ab = new AtomicBoolean(false);
-        this.left = new LeftNode<>(ab);
-        this.right = new RightNode<>(ab);
+        this.left = new LeftNode<>();
+        this.right = new RightNode<>();
         left.next = right;
         size = new LongAdder();
     }
@@ -34,7 +49,7 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
     * We start iterating the set from the "left" node keeping pred and curr pointers
     * We iterate until pred.t < t && curr.t > t,
     * If curr.key == null, we restart from left
-    * If curr.key == ours, we return false //We dont care too much about marked pointers, ideally, if we fail the cas, since we move forward, and we'll recheck if next is deleted
+    * If curr.key == ours, we return false //We don't care too much about marked pointers, ideally, if we fail the cas, since we move forward, and we'll recheck if a sentinel node was inserted
     * Otherwise we try cas pred.next -> our node
     * if that fails we set curr = pred.next
     * */
@@ -74,7 +89,7 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
         var l = left;
         var r = right;
         Node<T> seen = null;
-        Node<T> next = null;
+
         outer: for (; ;) {
             var pred = l;
             var curr = pred.loNext();
@@ -85,6 +100,7 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
                     if (!curr.casMarked()) continue outer;  //We try and cas if not, continue to outer
                     else {
                         size.decrement();
+                        Node<T> next;
                         Node<T> dummy = new Node<>(null, true); //Always set as marked
                         do {
                             next = curr.loNext();
@@ -105,6 +121,8 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
 
 
             // Helping unlink
+
+            // where d is deleted, c == curr current position, D = pred current position
             for (;;) {
                 Node<T> seenCurr = curr;
                 if (curr == r) return true;
@@ -112,9 +130,10 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
                     curr = curr.loNext(); //Keep moving forward
                 }
 
-                if (!pred.casNext(seenCurr, curr)) {
+                if (!pred.casNext(seenCurr, curr)) { //Cas from the seen curr to curr
+                    if (pred.isMarked()) continue outer; //If pred is already deleted
                     Node<T> p = pred;
-                    while (!(pred = p.loNext()).isMarked()){
+                    while (!(pred = p.loNext()).isMarked()){ //Keep moving p forward unti pred is marked
                         if (pred == r) return true;
                         p = pred; //Move till pred
                     }
@@ -139,24 +158,37 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
         Objects.requireNonNull(t);
         var l = left;
         var r = right;
-        outer: for (;;) {
-            var pred = l;
-            var curr = pred.loNext();
-            for (;;) {
-                if (curr == r) return false; //If we've reach the end of the list
-                if (curr.t == null && curr != l) continue outer;
-                if (!curr.isMarked() && compare(t, curr, l, r) == 0) return true;
-                if (compare(t, curr, l, r) > 0) {
-                    pred = curr;
-                    curr = pred.loNext();
-                } else return false;
+        var curr = l.loNext();
+        for (;;) {
+            if (curr == r) return false; //If we've reached the end of the list
+            if (curr.t == null) {
+                curr = curr.loNext();
+            } else if (!curr.isMarked() && compare(t, curr, l, r) == 0) return true;
 
-            }
+            if (compare(t, curr, l, r) > 0) curr = curr.loNext();
+            else return false;
+
         }
     }
 
     public int size() {
         return size.intValue();
+    }
+
+    public List<T> toList() {
+        List<T> ls = new ArrayList<>();
+        var l = left;
+        var r = right;
+        var curr = l.loNext();
+        //If we've reached the end of the list
+        while (curr != r) {
+            if (curr.t != null && !curr.isMarked()) {
+                ls.add(curr.t);
+            }
+            curr = curr.loNext();
+        }
+
+        return ls;
     }
 
     int compare(T t, Node<T> curr, Node<T> l, Node<T> r) {
@@ -176,17 +208,17 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
 
     private static class Node<T extends Comparable<T>> {
         private final T t;
-        private final AtomicBoolean marked;
+        private volatile boolean marked;
         private volatile Node<T> next;
 
         public Node(T t) {
             this.t = t;
-            this.marked = new AtomicBoolean(false);
+            this.marked = false;
         }
 
         public Node(T t, boolean marked) {
             this.t = t;
-            this.marked = new AtomicBoolean(marked);
+            this.marked = marked;
         }
 
         public Node<T> loNext(){
@@ -198,21 +230,21 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
         }
 
         public boolean isMarked(){
-            return marked.getAcquire();
+            return (boolean) MARKED.getAcquire(this);
         }
 
         public void spNext(Node<T> next) {
             NEXT.set(this, next);
         }
 
-        Node(T t,  AtomicBoolean marked , Node<T> next) {
+        Node(T t,  boolean marked , Node<T> next) {
             this.t = t;
             this.marked = marked;
             NEXT.set(this, next); //Backed by a volatile write
         }
 
         public boolean casMarked() {
-            return marked.compareAndSet(false, true);
+            return MARKED.compareAndSet(this, false, true);
         }
 
         @Override
@@ -225,17 +257,12 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
     private static class LeftNode<T extends Comparable<T>> extends Node<T> {
 
 
-        public LeftNode(T t, AtomicBoolean m , Node<T> next) {
-            super(t, m ,next);
+        public LeftNode(T t, boolean b , Node<T> next) {
+            super(t, b ,next);
         }
 
-        public LeftNode(Node<T> next) {
-            var b = new AtomicBoolean(true);
-            this(null, b , next);
-        }
-
-        public LeftNode(AtomicBoolean b) {
-            this(null, b ,null);
+        public LeftNode() {
+            this(null, false ,null);
         }
 
         public void soNext(Node<T> next){
@@ -254,17 +281,12 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
 
     private static class RightNode<T extends Comparable<T>> extends Node<T> {
 
-        public RightNode(T t, AtomicBoolean b, Node<T> next) {
+        public RightNode(T t, boolean b, Node<T> next) {
             super(t, b ,next);
         }
 
-        public RightNode(Node<T> next) {
-            var b = new AtomicBoolean(true);
-            this(null, b, next);
-        }
-
-        public RightNode(AtomicBoolean b) {
-            this(null, b, null);
+        public RightNode() {
+            this(null, false, null);
         }
 
         @Override
@@ -286,24 +308,15 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
     }
 
     private static final VarHandle NEXT;
+    private static final VarHandle MARKED;
 
     static {
         var l = MethodHandles.lookup();
         try {
             NEXT = l.findVarHandle(Node.class, "next", Node.class);
+            MARKED = l.findVarHandle(Node.class, "marked", boolean.class);
         }catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-    static void main() {
-        var ls = new ConcurrentOrderedLinkedList<Integer>();
-        ls.add(1);
-        ls.add(2);
-        ls.add(3);
-        IO.println(ls);
-        IO.println();
-        ls.remove(1);
-        IO.println(ls);
     }
 }
