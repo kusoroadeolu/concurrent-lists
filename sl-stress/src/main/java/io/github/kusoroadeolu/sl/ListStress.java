@@ -88,32 +88,34 @@ public class ListStress {
     @Outcome(id = "true", expect = Expect.ACCEPTABLE, desc = "List is sorted")
     @Outcome(id = "false", expect = Expect.FORBIDDEN, desc = "List is unsorted")
     @State
-    public static class ConcurrentOrderedListTest {
+    public static class ConcurrentOrderedListStress {
 
-        private final ConcurrentOrderedLinkedList<Integer> list = new ConcurrentOrderedLinkedList<>();
+        private ConcurrentOrderedLinkedList<Integer> list = new ConcurrentOrderedLinkedList<>();
 
         @Actor
         public void actor1() {
             list.add(1);
             list.add(3);
-            list.add(5);
+            list.remove(5);
+
         }
 
         @Actor
         public void actor2() {
             list.add(2);
-            list.add(4);
+            list.remove(1);
         }
 
         @Actor
         public void actor3() {
             list.remove(2);
-            list.remove(4);
+            list.add(5);
         }
 
         @Arbiter
         public void arbiter(Z_Result r) {
             List<Integer> ls = list.toList();
+
             r.r1 = IntStream.range(0, ls.size() - 1)
                     .allMatch(i -> ls.get(i) <= ls.get(i + 1));
         }

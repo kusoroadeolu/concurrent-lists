@@ -157,4 +157,74 @@ class ConcurrentOrderedLinkedListTest {
 
         });
     }
+
+    @Test
+    void concurrentAddsAndRemoves() {
+        Lincheck.runConcurrentTest(() -> {
+            var list = new ConcurrentOrderedLinkedList<Integer>();
+            Thread t1 = new Thread(() -> list.add(1));
+            Thread t2 = new Thread(() -> list.add(2));
+            Thread t3 = new Thread(() -> list.add(3));
+            Thread t4 = new Thread(() -> list.add(4));
+            Thread t5 = new Thread(() -> list.add(5));
+            //Removes
+            Thread t6 = new Thread(() -> list.remove(2));
+            Thread t7 = new Thread(() -> list.remove(4));
+            t1.start(); t2.start(); t3.start(); t4.start(); t5.start(); t6.start(); t7.start();
+
+
+            try {
+                t1.join();
+                t2.join();
+                t3.join();
+                t4.join();
+                t5.join();
+                t6.join();
+                t7.join();
+            }catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            var ls = list.toList();
+            boolean isSorted = IntStream.range(0, ls.size() - 1)
+                    .allMatch(i -> ls.get(i) <= ls.get(i + 1));
+            assertTrue(isSorted);
+
+        });
+    }
+
+
+    @Test
+    void concurrentRemoves() {
+        Lincheck.runConcurrentTest(() -> {
+            var list = new ConcurrentOrderedLinkedList<Integer>();
+
+            Thread t1 = new Thread(() -> {
+                list.add(1);
+                list.add(3);
+                list.remove(5);
+            });
+            Thread t2 = new Thread(() -> {
+                list.add(2);
+                list.remove(1);
+            });
+            Thread t3 = new Thread(() -> {
+                list.remove(2);
+                list.add(5);
+            });
+
+            t1.start(); t2.start(); t3.start();
+
+            try {
+                t1.join(); t2.join(); t3.join();
+                var ls = list.toList();
+
+                boolean isSorted = IntStream.range(0, ls.size() - 1)
+                        .allMatch(i -> ls.get(i) <= ls.get(i + 1));
+
+                assertTrue(isSorted);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
 }

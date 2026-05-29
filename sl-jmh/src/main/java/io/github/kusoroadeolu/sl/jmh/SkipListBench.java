@@ -52,9 +52,6 @@ SkipListBench.eightThreads        FG  thrpt   30   4.384 ± 0.076  ops/us
 SkipListBench.fourThreads        JDK  thrpt   30   9.242 ± 0.279  ops/us
 SkipListBench.fourThreads        OPT  thrpt   30   7.012 ± 0.313  ops/us
 SkipListBench.fourThreads         FG  thrpt   30   3.821 ± 0.058  ops/us
-SkipListBench.sixteenThreads     JDK  thrpt   30  13.036 ± 0.168  ops/us
-SkipListBench.sixteenThreads     OPT  thrpt   30   9.676 ± 0.208  ops/us
-SkipListBench.sixteenThreads      FG  thrpt   30   4.584 ± 0.067  ops/us
 SkipListBench.twoThreads         JDK  thrpt   30   6.534 ± 0.391  ops/us
 SkipListBench.twoThreads         OPT  thrpt   30   5.156 ± 0.367  ops/us
 SkipListBench.twoThreads          FG  thrpt   30   3.216 ± 0.138  ops/us
@@ -94,18 +91,6 @@ public class SkipListBench {
         doWork(bh);
     }
 
-
-    @Threads(16)
-    @Benchmark
-    public void sixteenThreads(Blackhole bh) {
-        doWork(bh);
-    }
-//
-//    @Threads(32)
-//    @Benchmark
-//    public void thirtyTwoThreads(Blackhole bh, ThreadState ts) {
-//        doWork(bh, ts);
-//    }
 
     private void doWork(Blackhole bh) {
         int key = ThreadLocalRandom.current().nextInt(10_000);

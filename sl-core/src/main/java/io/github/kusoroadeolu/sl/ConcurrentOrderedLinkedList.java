@@ -31,13 +31,11 @@ import java.util.concurrent.atomic.LongAdder;
 public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements ConcurrentListSet<T>{
     private final Node<T> left;
     private final Node<T> right;
-    private final LongAdder size;
 
     public ConcurrentOrderedLinkedList() {
         this.left = new LeftNode<>();
         this.right = new RightNode<>();
         left.next = right;
-        size = new LongAdder();
     }
 
     // A - B - D
@@ -46,37 +44,46 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
     //
 
     /*
-    * We start iterating the set from the "left" node keeping pred and curr pointers
-    * We iterate until pred.t < t && curr.t > t,
-    * If curr.key == null, we restart from left
-    * If curr.key == ours, we return false //We don't care too much about marked pointers, ideally, if we fail the cas, since we move forward, and we'll recheck if a sentinel node was inserted
-    * Otherwise we try cas pred.next -> our node
-    * if that fails we set curr = pred.next
-    * */
+     * We start iterating the set from the "left" node keeping pred and curr pointers
+     * We iterate until pred.t < t && curr.t > t,
+     * If curr.key == null, we restart from left
+     * If curr.key == ours, we return false //We don't care too much about marked pointers, ideally, if we fail the cas, since we move forward, and we'll recheck if a sentinel node was inserted
+     * Otherwise we try cas pred.next -> our node
+     * if that fails we set curr = pred.next
+     * */
     public boolean add(T t) {
         Objects.requireNonNull(t);
         var l = left;
         var r = right;
         var node = new Node<>(t);
-        outer: for (; ;) {
+        restartFromLeft: for (; ;) {
             var pred = l;
             var curr = pred.loNext();
             for (;;) {
-                if (curr.t == null && curr != l && curr != r) continue outer;
+                if (curr.isDummy() && curr != l && curr != r) continue restartFromLeft;
                 if (!curr.isMarked() && compare(t, curr, l, r) == 0) return false;
+                if (curr.isMarked()) { //If curr is marked try to unlink then restart from left
+                    tryUnlink(pred, curr);
+                    continue restartFromLeft;
+                }
                 if (compare(t, curr, l, r) > 0) {
                     pred = curr; curr = pred.loNext();
                 } else {
-                     //Ensure we immediately set curr = next; backed my volatile write
+                    //Ensure we immediately set curr = next; backed by volatile write
                     node.spNext(curr);
-                    if (pred.casNext(curr, node)) break outer;
-                    else curr = pred.loNext(); //Move backwards, don't change pred, two things could've happened, pred was deleted (it's next dummy next was marked) or a new node greater than pred was added
+                    if (pred.casNext(curr, node)) { //Linearization point
+                        break restartFromLeft;
+                    }
+                    if (pred.isMarked()) {
+                        continue restartFromLeft;
+                        //Move backwards, don't change pred, two things could've happened, pred was deleted (it's next dummy next was marked) or a new node greater than pred was added
+                    } else curr = pred.loNext();
                 }
 
             }
         }
 
-        size.increment();
+
         return true;
     }
 
@@ -88,64 +95,50 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
         Objects.requireNonNull(t);
         var l = left;
         var r = right;
-        Node<T> seen = null;
 
-        outer: for (; ;) {
+        restartFromLeft: for (; ;) {
             var pred = l;
             var curr = pred.loNext();
-            while (seen == null) {
+            while (true) {
                 if (curr == r) return false;
-                if (curr.t == null && curr != l) continue outer; //Restart from left
-                if (compare(t, curr, l, r) == 0) { //We haven't seen a node yet
-                    if (!curr.casMarked()) continue outer;  //We try and cas if not, continue to outer
-                    else {
-                        size.decrement();
-                        Node<T> next;
-                        Node<T> dummy = new Node<>(null, true); //Always set as marked
-                        do {
-                            next = curr.loNext();
-                            dummy.spNext(next); //Backed by cas
-                        } while (!curr.casNext(next, dummy));
-                        seen = curr;
-
-                        for (;;) {
-                            if (pred.t == null && !isLeftOrRight(pred, l, r)) continue outer;
-                            if (pred.casNext(curr, next)) return true;
-                            pred = pred.loNext(); //Shift to new next
-                        }
-                    }
-
+                if (curr.isDummy() && curr != l) continue restartFromLeft; //If we find a dummy node, restart from left
+                if (compare(t, curr, l, r) == 0) {
+                    if (curr.casMarked()) {
+                        tryUnlink(pred, curr);
+                        return true;
+                    } //else continue restartFromLeft; //We try and cas if not, restart from left
                 }
+
+                if (curr.isMarked() && !curr.isDummy()) {
+                    curr = tryUnlink(pred, curr);
+                }
+
+                if (curr == r) return false;
+
                 pred = curr; curr = pred.loNext();
             }
 
-
-            // Helping unlink
-
-            // where d is deleted, c == curr current position, D = pred current position
-            for (;;) {
-                Node<T> seenCurr = curr;
-                if (curr == r) return true;
-                while (curr.isMarked()) { //Right is never marked so we stop at right worst case
-                    curr = curr.loNext(); //Keep moving forward
-                }
-
-                if (!pred.casNext(seenCurr, curr)) { //Cas from the seen curr to curr
-                    if (pred.isMarked()) continue outer; //If pred is already deleted
-                    Node<T> p = pred;
-                    while (!(pred = p.loNext()).isMarked()){ //Keep moving p forward unti pred is marked
-                        if (pred == r) return true;
-                        p = pred; //Move till pred
-                    }
-
-                    pred = p; //Set pred back to p
-                    continue;
-                }
-
-                pred = curr; curr = pred.loNext();
-            }
+            // A(pred) - B(marked) - C(dummy) - R
+            // A(pred) - R (curr)
 
         }
+    }
+
+
+    //Returns the new pred
+    Node<T> tryUnlink(Node<T> pred, Node<T> curr) {
+        var s = curr;
+        Node<T> next;
+        Node<T> dummy = new Node<>(null, true); //Always set as marked
+        do {
+            next = curr.loNext();
+            if (next.isDummy()) break;
+            dummy.spNext(next); //Backed by cas
+        } while (!curr.casNext(next, dummy));
+
+        while (curr.isMarked()) curr = curr.loNext();
+        pred.casNext(s, curr);
+        return curr;
     }
 
     @Override
@@ -161,9 +154,8 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
         var curr = l.loNext();
         for (;;) {
             if (curr == r) return false; //If we've reached the end of the list
-            if (curr.t == null) {
-                curr = curr.loNext();
-            } else if (!curr.isMarked() && compare(t, curr, l, r) == 0) return true;
+            if (curr.isDummy()) curr = curr.loNext();
+            else if (!curr.isMarked() && compare(t, curr, l, r) == 0) return true;
 
             if (compare(t, curr, l, r) > 0) curr = curr.loNext();
             else return false;
@@ -172,7 +164,7 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
     }
 
     public int size() {
-        return size.intValue();
+        return toList().size();
     }
 
     public List<T> toList() {
@@ -198,12 +190,13 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
     }
 
     boolean isLeftOrRight(Node<T> node, Node<T> l, Node<T> r) {
-       return isNode(node, l) || isNode(node, r);
+        return isNode(node, l) || isNode(node, r);
     }
 
     boolean isNode(Node<T> node, Node<T> n) {
         return node == n;
     }
+
 
 
     private static class Node<T extends Comparable<T>> {
@@ -219,6 +212,10 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
         public Node(T t, boolean marked) {
             this.t = t;
             this.marked = marked;
+        }
+
+        boolean isDummy() {
+            return t == null;
         }
 
         public Node<T> loNext(){
