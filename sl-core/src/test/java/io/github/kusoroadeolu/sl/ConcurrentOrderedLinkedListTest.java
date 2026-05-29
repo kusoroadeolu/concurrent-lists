@@ -227,4 +227,33 @@ class ConcurrentOrderedLinkedListTest {
             }
         });
     }
+
+
+    @Test
+    void addRemove() {
+        Lincheck.runConcurrentTest(() -> {
+            var list = new ConcurrentOrderedLinkedList<Integer>();
+            list.add(1);
+            list.add(2);
+            list.add(3);
+
+            Thread t1 = new Thread(() -> {
+                list.remove(2);
+            });
+            Thread t2 = new Thread(() -> {
+                list.remove(1);
+            });
+
+            t1.start(); t2.start();
+
+            try {
+                t1.join(); t2.join();
+                var ls = list.toList();
+
+                assertEquals(1, ls.size());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
 }

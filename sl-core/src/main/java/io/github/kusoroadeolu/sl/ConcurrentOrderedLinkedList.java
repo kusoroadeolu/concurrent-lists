@@ -31,11 +31,13 @@ import java.util.concurrent.atomic.LongAdder;
 public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements ConcurrentListSet<T>{
     private final Node<T> left;
     private final Node<T> right;
+    private final LongAdder size;
 
     public ConcurrentOrderedLinkedList() {
         this.left = new LeftNode<>();
         this.right = new RightNode<>();
         left.next = right;
+        size = new LongAdder();
     }
 
     // A - B - D
@@ -63,8 +65,8 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
                 if (curr.isDummy() && curr != l && curr != r) continue restartFromLeft;
                 if (!curr.isMarked() && compare(t, curr, l, r) == 0) return false;
                 if (curr.isMarked()) { //If curr is marked try to unlink then restart from left
-                    tryUnlink(pred, curr);
-                    continue restartFromLeft;
+                    curr = tryUnlink(pred, curr); //This returns a new unmarked curr
+                    continue; //I could probably do something smarter here, but better safe than smart
                 }
                 if (compare(t, curr, l, r) > 0) {
                     pred = curr; curr = pred.loNext();
@@ -72,6 +74,7 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
                     //Ensure we immediately set curr = next; backed by volatile write
                     node.spNext(curr);
                     if (pred.casNext(curr, node)) { //Linearization point
+                        size.increment();
                         break restartFromLeft;
                     }
                     if (pred.isMarked()) {
@@ -104,6 +107,7 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
                 if (curr.isDummy() && curr != l) continue restartFromLeft; //If we find a dummy node, restart from left
                 if (compare(t, curr, l, r) == 0) {
                     if (curr.casMarked()) {
+                        size.decrement();
                         tryUnlink(pred, curr);
                         return true;
                     } //else continue restartFromLeft; //We try and cas if not, restart from left
@@ -111,9 +115,8 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
 
                 if (curr.isMarked() && !curr.isDummy()) {
                     curr = tryUnlink(pred, curr);
+                    continue;
                 }
-
-                if (curr == r) return false;
 
                 pred = curr; curr = pred.loNext();
             }
@@ -174,7 +177,7 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
         var curr = l.loNext();
         //If we've reached the end of the list
         while (curr != r) {
-            if (curr.t != null && !curr.isMarked()) {
+            if (!curr.isDummy() && !curr.isMarked()) {
                 ls.add(curr.t);
             }
             curr = curr.loNext();

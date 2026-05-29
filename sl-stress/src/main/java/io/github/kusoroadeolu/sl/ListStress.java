@@ -42,6 +42,39 @@ public class ListStress {
         }
     }
 
+
+    @JCStressTest
+    @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Invariant maintained")
+    @State
+    public static class AddRemoveTest {
+        public  ConcurrentListSet<Integer> set;
+
+        public AddRemoveTest() {
+            this.set = new ConcurrentOrderedLinkedList<>();
+            set.add(1);
+            set.add(2);
+            set.add(3);
+        }
+
+
+        @Actor
+        public void actor() {
+            set.remove(1);
+        }
+
+        @Actor
+        public void actor1() {
+            set.remove(2);
+        }
+
+
+
+        @Arbiter
+        public void arbiter(I_Result r) {
+            r.r1 = set.size();
+        }
+    }
+
     @JCStressTest
     @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Invariant maintained")
     @State
