@@ -65,8 +65,8 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
                 if (curr.isDummy() && curr != l && curr != r) continue restartFromLeft;
                 if (!curr.isMarked() && compare(t, curr, l, r) == 0) return false;
                 if (curr.isMarked()) { //If curr is marked try to unlink then restart from left
-                    curr = helpUnlink(pred, curr); //This returns a new unmarked curr
-                    continue; //I could probably do something smarter here, but better safe than smart
+                    curr = helpUnlink(pred, curr); //Only shift curr
+                    continue;
                 }
                 if (compare(t, curr, l, r) > 0) {
                     pred = curr; curr = pred.loNext();
@@ -132,14 +132,22 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
     Node<T> helpUnlink(Node<T> pred, Node<T> curr) {
         var s = curr;
         Node<T> next;
-        Node<T> dummy = new Node<>(null, true); //Always set as marked
-        do {
-            next = curr.loNext();
-            if (next.isDummy()) break;
-            dummy.spNext(next); //Backed by cas
-        } while (!curr.casNext(next, dummy));
+        Node<T> dummy;
 
-        while (curr.isMarked()) curr = curr.loNext();
+
+        //If we find any marked node that's not a dummy while traversing, we need to ensure it already has it's dummy tombstone, otherwise we can have lost writs
+        while (curr.isMarked()) {
+            if (!curr.isDummy()) {
+                dummy = new Node<>(null, true);
+                do {
+                    next = curr.loNext();
+                    if (next.isDummy()) break;
+                    dummy.spNext(next); //Backed by cas
+                } while (!curr.casNext(next, dummy));
+            }
+           curr = curr.loNext(); //We might not have been the ones to cas dummy to so we still need to use curr to move ahead
+        }
+
         pred.casNext(s, curr);
         return curr;
     }
