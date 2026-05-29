@@ -7,6 +7,9 @@ import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+
+// A - B - C - D - E
+// A - B - C - D(deleted) - E
 class ConcurrentOrderedLinkedListTest {
     @Test
     void containsTest() {

@@ -103,14 +103,14 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
             var pred = l;
             var curr = pred.loNext();
             while (true) {
-                if (curr == r) return false;
+                if (!curr.isMarked() && compare(t, curr, l, r) < 0) return false;
                 if (curr.isDummy() && curr != l) continue restartFromLeft; //If we find a dummy node, restart from left
                 if (compare(t, curr, l, r) == 0) {
                     if (curr.casMarked()) {
                         size.decrement();
                         helpUnlink(pred, curr);
                         return true;
-                    } //else continue restartFromLeft; //We try and cas if not, restart from left
+                    } else continue restartFromLeft; //We try and cas if not, restart from left
                 }
 
                 if (curr.isMarked() && !curr.isDummy()) {
