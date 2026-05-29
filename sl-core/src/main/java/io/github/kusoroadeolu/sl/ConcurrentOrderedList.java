@@ -28,12 +28,12 @@ import java.util.concurrent.atomic.LongAdder;
 // We exit the loop when pred // curr = right
 
 
-public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements ConcurrentListSet<T>{
+public class ConcurrentOrderedList<T extends Comparable<T>> implements ConcurrentListSet<T>{
     private final Node<T> left;
     private final Node<T> right;
     private final LongAdder size;
 
-    public ConcurrentOrderedLinkedList() {
+    public ConcurrentOrderedList() {
         this.left = new LeftNode<>();
         this.right = new RightNode<>();
         left.next = right;
@@ -65,7 +65,7 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
                 if (curr.isDummy() && curr != l && curr != r) continue restartFromLeft;
                 if (!curr.isMarked() && compare(t, curr, l, r) == 0) return false;
                 if (curr.isMarked()) { //If curr is marked try to unlink then restart from left
-                    curr = tryUnlink(pred, curr); //This returns a new unmarked curr
+                    curr = helpUnlink(pred, curr); //This returns a new unmarked curr
                     continue; //I could probably do something smarter here, but better safe than smart
                 }
                 if (compare(t, curr, l, r) > 0) {
@@ -108,13 +108,13 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
                 if (compare(t, curr, l, r) == 0) {
                     if (curr.casMarked()) {
                         size.decrement();
-                        tryUnlink(pred, curr);
+                        helpUnlink(pred, curr);
                         return true;
                     } //else continue restartFromLeft; //We try and cas if not, restart from left
                 }
 
                 if (curr.isMarked() && !curr.isDummy()) {
-                    curr = tryUnlink(pred, curr);
+                    curr = helpUnlink(pred, curr);
                     continue;
                 }
 
@@ -128,8 +128,8 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
     }
 
 
-    //Returns the new pred
-    Node<T> tryUnlink(Node<T> pred, Node<T> curr) {
+    //Returns the next undead node
+    Node<T> helpUnlink(Node<T> pred, Node<T> curr) {
         var s = curr;
         Node<T> next;
         Node<T> dummy = new Node<>(null, true); //Always set as marked
@@ -167,7 +167,7 @@ public class ConcurrentOrderedLinkedList<T extends Comparable<T>> implements Con
     }
 
     public int size() {
-        return toList().size();
+        return size.intValue();
     }
 
     public List<T> toList() {

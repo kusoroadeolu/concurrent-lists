@@ -1,6 +1,6 @@
 package io.github.kusoroadeolu.sl.jmh;
 
-import io.github.kusoroadeolu.sl.ConcurrentOrderedLinkedList;
+import io.github.kusoroadeolu.sl.ConcurrentOrderedList;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.profile.JavaFlightRecorderProfiler;
@@ -70,7 +70,7 @@ public class SkipListBench {
 //            default -> throw new IllegalArgumentException();
 //        };
 
-        set = new ConcurrentOrderedLinkedList<>();
+        set = new ConcurrentOrderedList<>();
     }
 
     @Threads(2)
