@@ -58,7 +58,7 @@ import static io.github.kusoroadeolu.sl.Utils.generateLevel;
  * @author kusoroadeolu
  * */
 @SuppressWarnings("unchecked")
-public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> implements ConcurrentListSet<T> {
+public class OptimisticSkipList<T extends Comparable<T>> implements ConcurrentListSet<T> {
     private final Node<T> left;
     private final Node<T> right;
     private final int height;
@@ -67,7 +67,7 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> implements
     private final ThreadLocal<Node<T>[]> succs;
     private volatile int chl; //Current highest level used by the findNode method to avoid traversing from the max height every iteration
 
-    public OptimisticConcurrentSkipListSet(int height) {
+    public OptimisticSkipList(int height) {
         this.left = new LeftNode<>(null, height);
         this.right = new RightNode<>(null, height);
         this.height = height;
@@ -175,7 +175,7 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> implements
             if (isMarked || okToDelete(node, lFound)) {
                 if (!isMarked) {
                     node.lock();
-                    if (node.lpMarked()) { //If this is marked, a plain read is ok here
+                    if (node.lpMarked()) { //A plain read is ok here since we hold the lock
                         node.unlock();
                         return false;
                     }
@@ -418,7 +418,7 @@ public class OptimisticConcurrentSkipListSet<T extends Comparable<T>> implements
     static {
         var l = MethodHandles.lookup();
         try {
-            CHL = l.findVarHandle(OptimisticConcurrentSkipListSet.class, "chl", int.class);
+            CHL = l.findVarHandle(OptimisticSkipList.class, "chl", int.class);
             FULLY_LINKED = l.findVarHandle(Node.class, "fullyLinked", boolean.class);
             MARKED = l.findVarHandle(Node.class, "marked", boolean.class);
         }catch (ReflectiveOperationException e) {

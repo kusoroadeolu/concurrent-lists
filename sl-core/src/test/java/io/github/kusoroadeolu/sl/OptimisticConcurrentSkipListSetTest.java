@@ -10,7 +10,7 @@ class OptimisticConcurrentSkipListSetTest {
     @Test
     void noLostWrites() {
         Lincheck.runConcurrentTest(() -> {
-            var list = new OptimisticConcurrentSkipListSet<Integer>(4);
+            var list = new OptimisticSkipList<Integer>(4);
             Thread t1 = new Thread(() -> list.add(1));
             Thread t2 = new Thread(() -> list.add(2));
             Thread t3 = new Thread(() -> list.add(3));
@@ -35,7 +35,7 @@ class OptimisticConcurrentSkipListSetTest {
     @Test
     void removeAddTest() {
         Lincheck.runConcurrentTest(() -> {
-            var list = new OptimisticConcurrentSkipListSet<Integer>(4);
+            var list = new OptimisticSkipList<Integer>(4);
             Thread t1 = new Thread(() -> list.add(1));
             Thread t2 = new Thread(() -> list.add(2));
             Thread t3 = new Thread(() -> list.add(3));
@@ -61,7 +61,7 @@ class OptimisticConcurrentSkipListSetTest {
     @Test
     void sizeOnDuplicateAddsTest() {
         Lincheck.runConcurrentTest(() -> {
-            var list = new OptimisticConcurrentSkipListSet<Integer>(4);
+            var list = new OptimisticSkipList<Integer>(4);
             Thread t1 = new Thread(() -> list.add(1));
             Thread t2 = new Thread(() -> list.add(2));
             Thread t3 = new Thread(() -> list.add(2));

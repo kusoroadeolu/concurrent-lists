@@ -9,25 +9,28 @@ import java.util.Objects;
 import java.util.concurrent.atomic.LongAdder;
 
 //A lock free ordered linked singly linked list set
-// States - marked (linearization point for removal), null key (means the pred node has been logically fully deleted)
-// While I'd build a skip list, the ordering of each level of a linked list in a skip list is the meatier problem, so i'll just save myself all the extra work and build the linked list instead
-// The next node ideas were borrowed from fraser's linked thesis and the JDK Skip list map
+// States - marked (linearization point for removal), null key (means the pred node has been logically fully deleted), next pointer marked as a tombstone (node is going to be unlinked, don't cas to it's next ptr)
+// The next node ideas were borrowed from fraser's thesis and the JDK Skip list map
 
 // ADD
 // A node can be said to be inserted when it successfully when it successfully performs a CAS on a node whose value is less than it,
 // if a node's value is equal to t and the node is not marked as deleted, we return false
-// On cas failure, a thread retries, moving its next pointer to the new next variable
-// If a next pointer indicates a pred node has been deleted, we retry from the left of the list (which is pretty expensive, but we cant move backwards in this list)
+// On cas failure, a thread retries either moving its next pointer to the new next variable or checking if its predecessor has been deleted
+// If its predecessor has been deleted, we retry from the left of the list (which is pretty expensive, but we cant move backwards in this list)
+
+// During traversal if our curr node is marked as deleted, we mark it as ready to be unlinked and then try to link our pred to the closest alive node
 
 // DELETES
-// A node can be said to be deleted if we find an unmarked node equal to T, and we try CAS it to be marked as deleted
+// A node can be said to be deleted if we find an unmarked node equal to T, and we successfully CAS it to be marked
 // If we don't succeed the cas we retry as another thread could've added a new unmarked node, returning false if we fail to find a new node
 // We then try to cas pred.next to the next, if we fail, we continue from outer and try to help other threads going through deletion
 // During helping we ensure pred is always on an unmarked node while moving curr to the closest unmarked node from curr,
-// if pred is ever marked,  we reset pred to left and curr to left.next
-// We exit the loop when pred // curr = right
+// if pred is ever marked, we restart from left
+// We exit the loop when curr.t > t
 
-
+/**
+ * @author kusoroadeolu
+ * */
 public class ConcurrentOrderedList<T extends Comparable<T>> implements ConcurrentListSet<T>{
     private final Node<T> left;
     private final Node<T> right;
@@ -64,7 +67,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
             for (;;) {
                 if (curr.isDummy() && curr != l && curr != r) continue restartFromLeft;
                 if (!curr.isMarked() && compare(t, curr, l, r) == 0) return false;
-                if (curr.isMarked()) { //If curr is marked try to unlink then restart from left
+                if (curr.isMarked()) { //If curr is marked try to unlink
                     curr = helpUnlink(pred, curr); //Only shift curr
                     continue;
                 }
@@ -77,10 +80,10 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
                         size.increment();
                         break restartFromLeft;
                     }
-                    if (pred.isMarked()) {
-                        continue restartFromLeft;
-                        //Move backwards, don't change pred, two things could've happened, pred was deleted (it's next dummy next was marked) or a new node greater than pred was added
-                    } else curr = pred.loNext();
+                    //Move backwards, don't change pred, two things could've happened, pred was deleted (its dummy tombstone was introduced) or a new node greater than pred was added
+
+                    if (pred.isMarked()) continue restartFromLeft;
+                    else curr = pred.loNext();
                 }
 
             }
@@ -104,19 +107,23 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
             var curr = pred.loNext();
             while (true) {
                 if (!curr.isMarked() && compare(t, curr, l, r) < 0) return false;
+
                 if (curr.isDummy() && curr != l) continue restartFromLeft; //If we find a dummy node, restart from left
-                if (compare(t, curr, l, r) == 0) {
-                    if (curr.casMarked()) {
-                        size.decrement();
-                        helpUnlink(pred, curr);
-                        return true;
-                    } else continue restartFromLeft; //We try and cas if not, restart from left
-                }
 
                 if (curr.isMarked() && !curr.isDummy()) {
                     curr = helpUnlink(pred, curr);
                     continue;
                 }
+
+                if (compare(t, curr, l, r) == 0) {
+                    if (curr.casMarked()) {
+                        size.decrement();
+                        helpUnlink(pred, curr);
+                        return true;
+                    } else return false; //We return false
+                }
+
+
 
                 pred = curr; curr = pred.loNext();
             }
@@ -148,7 +155,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
            curr = curr.loNext(); //We might not have been the ones to cas dummy to so we still need to use curr to move ahead
         }
 
-        pred.casNext(s, curr);
+        pred.casNext(s, curr); //try to link. failure is alright, all we need is the new unmarked(at this point) curr node
         return curr;
     }
 

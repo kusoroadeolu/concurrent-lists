@@ -6,15 +6,14 @@ import org.junit.jupiter.api.Test;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-
-// A - B - C - D - E
-// A - B - C - D(deleted) - E
-class ConcurrentOrderedLinkedListTest {
+class LazyOptimisticListTest {
     @Test
     void containsTest() {
         Lincheck.runConcurrentTest(() -> {
-            var list = new ConcurrentOrderedList<Integer>();
+            var list = new LazyOptimisticList<Integer>();
             Thread t1 = new Thread(() -> list.add(1));
             Thread t2 = new Thread(() -> list.add(2));
             Thread t3 = new Thread(() -> list.add(3));
@@ -39,7 +38,7 @@ class ConcurrentOrderedLinkedListTest {
     @Test
     void removeTest() {
         Lincheck.runConcurrentTest(() -> {
-            var list = new ConcurrentOrderedList<Integer>();
+            var list = new LazyOptimisticList<Integer>();
             Thread t1 = new Thread(() -> list.add(1));
             Thread t2 = new Thread(() -> list.add(2));
             Thread t3 = new Thread(() -> list.add(3));
@@ -65,7 +64,7 @@ class ConcurrentOrderedLinkedListTest {
     @Test
     void correctlyOrdered() {
         Lincheck.runConcurrentTest(() -> {
-            var list = new ConcurrentOrderedList<Integer>();
+            var list = new LazyOptimisticList<Integer>();
             Thread t1 = new Thread(() -> list.add(1));
             Thread t2 = new Thread(() -> list.add(2));
             Thread t3 = new Thread(() -> list.add(3));
@@ -90,7 +89,7 @@ class ConcurrentOrderedLinkedListTest {
     @Test
     void concurrentRemoves() {
         Lincheck.runConcurrentTest(() -> {
-            var list = new ConcurrentOrderedList<Integer>();
+            var list = new LazyOptimisticList<Integer>();
 
             Thread t1 = new Thread(() -> {
                 list.add(1);
