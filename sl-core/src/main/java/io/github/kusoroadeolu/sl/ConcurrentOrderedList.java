@@ -34,13 +34,11 @@ import java.util.concurrent.atomic.LongAdder;
 public class ConcurrentOrderedList<T extends Comparable<T>> implements ConcurrentListSet<T>{
     private final Node<T> left;
     private final Node<T> right;
-    private final LongAdder size;
 
     public ConcurrentOrderedList() {
         this.left = new LeftNode<>();
         this.right = new RightNode<>();
         left.next = right;
-        size = new LongAdder();
     }
 
     // A - B - D
@@ -77,8 +75,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
                     //Ensure we immediately set curr = next; backed by volatile write
                     node.spNext(curr);
                     if (pred.casNext(curr, node)) { //Linearization point
-                        size.increment();
-                        break restartFromLeft;
+                        return true;
                     }
                     //Move backwards, don't change pred, two things could've happened, pred was deleted (its dummy tombstone was introduced) or a new node greater than pred was added
 
@@ -89,8 +86,6 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
             }
         }
 
-
-        return true;
     }
 
     //We iterate until we find t keeping track of pred, curr vars
@@ -117,7 +112,6 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
 
                 if (compare(t, curr, l, r) == 0) {
                     if (curr.casMarked()) {
-                        size.decrement();
                         helpUnlink(pred, curr);
                         return true;
                     } else return false; //We return false
@@ -155,7 +149,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
            curr = curr.loNext(); //We might not have been the ones to cas dummy to so we still need to use curr to move ahead
         }
 
-        pred.casNext(s, curr); //try to link. failure is alright, all we need is the new unmarked(at this point) curr node
+        pred.casNext(s, curr); //try to link. failure is alright, another node has unlinked this , all we need is the new unmarked (at this point) curr node
         return curr;
     }
 
@@ -171,18 +165,28 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
         var r = right;
         var curr = l.loNext();
         for (;;) {
+            int res = 0;
             if (curr == r) return false; //If we've reached the end of the list
-            if (curr.isDummy()) curr = curr.loNext();
-            else if (!curr.isMarked() && compare(t, curr, l, r) == 0) return true;
-
-            if (compare(t, curr, l, r) > 0) curr = curr.loNext();
+            else if (!curr.isMarked() && (res = compare(t, curr, l, r)) == 0) return true;
+            else if (curr.isMarked() || res > 0) curr = curr.loNext();
             else return false;
-
         }
     }
 
     public int size() {
-        return size.intValue();
+        var l = left;
+        var r = right;
+        var curr = l.loNext();
+        int size = 0;
+        //If we've reached the end of the list
+        while (curr != r) {
+            if (!curr.isMarked()) { //Since dummy nodes are marked, a marked flag is alright here
+                ++size;
+            }
+            curr = curr.loNext();
+        }
+
+        return size;
     }
 
     public List<T> toList() {
@@ -192,7 +196,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
         var curr = l.loNext();
         //If we've reached the end of the list
         while (curr != r) {
-            if (!curr.isDummy() && !curr.isMarked()) {
+            if (!curr.isMarked()) {
                 ls.add(curr.t);
             }
             curr = curr.loNext();
@@ -203,7 +207,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
 
     int compare(T t, Node<T> curr, Node<T> l, Node<T> r) {
         if (curr == r) return -1;       // right sentinel, stop
-        if (curr == l) return 1;
+        if (curr == l) return 1; //cant happen
         return t.compareTo(curr.t);
     }
 

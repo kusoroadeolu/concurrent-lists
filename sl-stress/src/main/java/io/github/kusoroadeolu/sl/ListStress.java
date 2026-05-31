@@ -5,12 +5,17 @@ import org.openjdk.jcstress.infra.results.I_Result;
 import org.openjdk.jcstress.infra.results.Z_Result;
 
 import java.util.List;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.IntStream;
+
+import static org.openjdk.jcstress.annotations.Expect.ACCEPTABLE;
+import static org.openjdk.jcstress.annotations.Expect.ACCEPTABLE_INTERESTING;
 
 public class ListStress {
 
     @JCStressTest
-    @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Invariant maintained")
+    @Outcome(id = "1", expect = ACCEPTABLE, desc = "Invariant maintained")
     @State
     public static class UniqueInvariantStress {
         public final ConcurrentListSet<Integer> set;
@@ -44,7 +49,7 @@ public class ListStress {
 
 
     @JCStressTest
-    @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Invariant maintained")
+    @Outcome(id = "1", expect = ACCEPTABLE, desc = "Invariant maintained")
     @State
     public static class AddRemoveTest {
         public  ConcurrentListSet<Integer> set;
@@ -76,7 +81,7 @@ public class ListStress {
     }
 
     @JCStressTest
-    @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Invariant maintained")
+    @Outcome(id = "1", expect = ACCEPTABLE, desc = "Invariant maintained")
     @State
     public static class RemoveInvariantStress {
         public final ConcurrentListSet<Integer> set;
@@ -118,7 +123,7 @@ public class ListStress {
     }
 
     @JCStressTest
-    @Outcome(id = "true", expect = Expect.ACCEPTABLE, desc = "List is sorted")
+    @Outcome(id = "true", expect = ACCEPTABLE, desc = "List is sorted")
     @Outcome(id = "false", expect = Expect.FORBIDDEN, desc = "List is unsorted")
     @State
     public static class ConcurrentOrderedListStress {
@@ -151,6 +156,30 @@ public class ListStress {
 
             r.r1 = IntStream.range(0, ls.size() - 1)
                     .allMatch(i -> ls.get(i) <= ls.get(i + 1));
+        }
+    }
+
+    @JCStressTest(Mode.Termination)
+    @Outcome(id = "TERMINATED", expect = ACCEPTABLE,             desc = "Gracefully finished")
+    @Outcome(id = "STALE",      expect = ACCEPTABLE_INTERESTING, desc = "Test is stuck")
+    @State
+    public static class LockBasedReads {
+         boolean ready = false;
+         private Lock lock = new ReentrantLock();
+
+        @Actor
+        public void actor() {
+            while (!ready);
+        }
+
+        @Signal
+        public void signaller() {
+            lock.lock();
+            try {
+                ready = true;
+            }finally {
+                lock.unlock();
+            }
         }
     }
 

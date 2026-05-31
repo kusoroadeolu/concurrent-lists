@@ -2,6 +2,7 @@ package io.github.kusoroadeolu.sl;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.Lock;
@@ -142,7 +143,7 @@ public class OptimisticSkipList<T extends Comparable<T>> implements ConcurrentLi
                     pred = preds[layer];
                     succ = succs[layer];
 
-                    node.setNextAt(layer, succ);
+                    node.setNextAtPlain(layer, succ); //Backed by release from pred. B - C. A - B. Where a is pred, any node reading a.next is guaranteed to see node.next
                     pred.setNextAt(layer, node);
                 }
 
@@ -204,7 +205,7 @@ public class OptimisticSkipList<T extends Comparable<T>> implements ConcurrentLi
                     //Splice from max level downwards
                     for (int layer = maxLevel - 1; layer >= 0; --layer) {
                         pred = preds[layer];
-                        pred.setNextAt(layer, node.nextAt(layer));
+                        pred.setNextAt(layer, node.nextAtPlain(layer)); //Still hold the lock so a plain write is ok here
                     }
 
                     node.unlock();
@@ -232,18 +233,24 @@ public class OptimisticSkipList<T extends Comparable<T>> implements ConcurrentLi
         return node.loFullyLinked() && !node.loMarked();
     }
 
+    @Override
+    public List<T> toList() {
+        return List.of();
+    }
+
     public int size(){
         return size.intValue();
     }
 
     boolean validate(Node<T> pred, Node<T> succ, int layer) {
-        return !pred.loMarked() && !succ.loMarked() && pred.nextAt(layer) == succ;
+        return !pred.loMarked() && !succ.loMarked() && pred.nextAtPlain(layer) == succ;
     }
 
     //Here succ can be marked, ideally if succ is marked for deletion, its needs to obtain its pred node, which is us, so as long as we hold our node, succ cannot change
     //When succ eventually holds the node, it will be visible we are dead and restart
     boolean weakValidate(Node<T> pred, Node<T> succ, int layer) {
-        return !pred.loMarked() && pred.nextAt(layer) == succ;
+        return !pred.loMarked() && pred.nextAtPlain(layer) == succ; //Plain read, since theyre acquired under locks
+
     }
 
 
@@ -326,12 +333,22 @@ public class OptimisticSkipList<T extends Comparable<T>> implements ConcurrentLi
         }
 
         Node<T> nextAt(int i) {
-            return nexts[i];
+            return (Node<T>) NEXTS.getAcquire(nexts, i);
+        }
+
+        Node<T> nextAtPlain(int i) {
+            return (Node<T>) NEXTS.get(nexts, i);
         }
 
         void setNextAt(int i, Node<T> next) {
-            nexts[i] = next;
+            NEXTS.setRelease(nexts, i, next);
         }
+
+
+        void setNextAtPlain(int i, Node<T> next) {
+            NEXTS.set(nexts, i, next);
+        }
+
 
         void soFullyLinked(){
             FULLY_LINKED.setRelease(this, true);
@@ -414,6 +431,7 @@ public class OptimisticSkipList<T extends Comparable<T>> implements ConcurrentLi
     private static final VarHandle FULLY_LINKED;
     private static final VarHandle MARKED;
     private static final VarHandle CHL;
+    private static final VarHandle NEXTS;
 
     static {
         var l = MethodHandles.lookup();
@@ -421,6 +439,7 @@ public class OptimisticSkipList<T extends Comparable<T>> implements ConcurrentLi
             CHL = l.findVarHandle(OptimisticSkipList.class, "chl", int.class);
             FULLY_LINKED = l.findVarHandle(Node.class, "fullyLinked", boolean.class);
             MARKED = l.findVarHandle(Node.class, "marked", boolean.class);
+            NEXTS = MethodHandles.arrayElementVarHandle(Node[].class);
         }catch (ReflectiveOperationException e) {
             throw new RuntimeException(e);
         }

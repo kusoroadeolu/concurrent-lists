@@ -2,6 +2,7 @@ package io.github.kusoroadeolu.sl;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 public interface ConcurrentListSet<T> extends Set<T> {
@@ -14,6 +15,8 @@ public interface ConcurrentListSet<T> extends Set<T> {
     boolean contains(Object t);
 
     int size();
+
+    List<T> toList();
 
     @Override
     default Iterator<T> iterator() {

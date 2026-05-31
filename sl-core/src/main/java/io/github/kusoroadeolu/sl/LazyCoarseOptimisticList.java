@@ -4,33 +4,27 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-// Based on the paper https://www.researchgate.net/publication/220440170_A_Lazy_Concurrent_List-Based_Set_Algorithm
-/* The code is quite easy to reason about
-* The main idea of the paper is we lazily acquire locks, traversing the list on modification operations only acquiring locks for nodes when we want to modify them
-* Read operations however are wait free, as threads need not acquire locks during traversal and visibility is ensured by happens before guarantee of locks
-*
-* A simple optimization made in this impl is validation the state of a node before acquiring the node locks
-* * */
-public class LazyOptimisticList<T extends Comparable<T>> implements ConcurrentListSet<T>{
-
+//So similar to the lazy optimistic list, but instead we just use a fat lock instead of a lock per node
+public class LazyCoarseOptimisticList<T extends Comparable<T>> implements ConcurrentListSet<T>{
     private final Node<T> left;
     private final Node<T> right;
+    private final Lock lock;
 
-    public LazyOptimisticList() {
+    public LazyCoarseOptimisticList() {
         this.left = new Node<>(null);
         this.right = new Node<>(null);
-        left.lock();
+        lock = new ReentrantLock();
+        lock.lock();
         try {
             left.soNext(right);
         }finally {
-            left.unlock();
+            lock.unlock();
         }
-
     }
+
 
     @Override
     public boolean add(T t) {
@@ -50,21 +44,16 @@ public class LazyOptimisticList<T extends Comparable<T>> implements ConcurrentLi
             //A - B - C
             if (pred.loMarked() || curr.loMarked()) continue;
 
+            var lc = lock;
             try {
-                pred.lock();
-                if (pred.lpMarked() || pred.lpNext() != curr) continue;
-                try {
-                    curr.lock();
-                    if (curr.lpMarked()) continue;
-                    Node<T> node = new Node<>(t);
-                    node.spNext(curr);
-                    pred.soNext(node); //Order here matters, we need to ensure node#next is set before we link pred to node. Set release ensures node write is visible
-                    return true;
-                }finally {
-                    curr.unlock();
-                }
+                lc.lock();
+                if (pred.lpMarked() || curr.lpMarked() || pred.lpNext() != curr) continue;
+                Node<T> node = new Node<>(t);
+                node.spNext(curr);
+                pred.soNext(node); //Order here matters, we need to ensure node#next is set before we link pred to node. Set release ensures node write is visible
+                return true;
             } finally {
-                pred.unlock();
+                lc.unlock();
             }
         }
 
@@ -95,20 +84,16 @@ public class LazyOptimisticList<T extends Comparable<T>> implements ConcurrentLi
             if (curr.loMarked()) return false;
             if (pred.loMarked()) continue;
 
+            var lc = lock;
             try {
-                pred.lock();
+                lc.lock();
                 if (pred.lpMarked() || pred.lpNext() != curr) continue; //Validate before trying to acquire curr lock
-                try {
-                    curr.lock();
-                    if (curr.lpMarked()) return false;
-                    curr.soMarked();
-                    pred.soNext(curr.lpNext()); //Order here matters, we need to ensure node#next is set before we link pred to node
-                    return true;
-                }finally {
-                    curr.unlock();
-                }
+                if (curr.lpMarked()) return false;
+                curr.soMarked();
+                pred.soNext(curr.lpNext()); //Order here matters, we need to ensure node#next is set before we link pred to node
+                return true;
             } finally {
-                pred.unlock();
+                lc.unlock();
             }
         }
     }
@@ -197,17 +182,11 @@ public class LazyOptimisticList<T extends Comparable<T>> implements ConcurrentLi
             NEXT.set(this, node);
         }
 
+
         boolean lpMarked() {
             return (boolean) MARKED.get(this);
         }
 
-        void lock() {
-            lock.lock();
-        }
-
-        void unlock() {
-            lock.unlock();
-        }
     }
 
     private static final VarHandle NEXT;
@@ -216,10 +195,11 @@ public class LazyOptimisticList<T extends Comparable<T>> implements ConcurrentLi
     static {
         var l = MethodHandles.lookup();
         try {
-            NEXT = l.findVarHandle(LazyOptimisticList.Node.class, "next", Node.class);
-            MARKED = l.findVarHandle(LazyOptimisticList.Node.class, "marked", boolean.class);
+            NEXT = l.findVarHandle(Node.class, "next", Node.class);
+            MARKED = l.findVarHandle(Node.class, "marked", boolean.class);
         }catch (ReflectiveOperationException e) {
             throw new RuntimeException(e);
         }
     }
+
 }
