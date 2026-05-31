@@ -4,7 +4,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -15,12 +14,12 @@ import java.util.concurrent.locks.ReentrantLock;
 *
 * A simple optimization made in this impl is validation the state of a node before acquiring the node locks
 * * */
-public class LazyOptimisticList<T extends Comparable<T>> implements ConcurrentListSet<T>{
+public class LazySyncList<T extends Comparable<T>> implements ConcurrentListSet<T>{
 
     private final Node<T> left;
     private final Node<T> right;
 
-    public LazyOptimisticList() {
+    public LazySyncList() {
         this.left = new Node<>(null);
         this.right = new Node<>(null);
         left.lock();
@@ -216,8 +215,8 @@ public class LazyOptimisticList<T extends Comparable<T>> implements ConcurrentLi
     static {
         var l = MethodHandles.lookup();
         try {
-            NEXT = l.findVarHandle(LazyOptimisticList.Node.class, "next", Node.class);
-            MARKED = l.findVarHandle(LazyOptimisticList.Node.class, "marked", boolean.class);
+            NEXT = l.findVarHandle(LazySyncList.Node.class, "next", Node.class);
+            MARKED = l.findVarHandle(LazySyncList.Node.class, "marked", boolean.class);
         }catch (ReflectiveOperationException e) {
             throw new RuntimeException(e);
         }

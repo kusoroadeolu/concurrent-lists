@@ -1,7 +1,6 @@
 package io.github.kusoroadeolu.sl.jmh;
 
 import io.github.kusoroadeolu.sl.FineGrainedSkipList;
-import io.github.kusoroadeolu.sl.LazyOptimisticList;
 import io.github.kusoroadeolu.sl.OptimisticSkipList;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
@@ -58,6 +57,19 @@ SkipListBench.fourThreads       FG  thrpt   30   3.902 ±  0.103  ops/us
 SkipListBench.twoThreads       JDK  thrpt   30   6.405 ±  0.297  ops/us
 SkipListBench.twoThreads       OPT  thrpt   30   6.272 ±  0.509  ops/us
 SkipListBench.twoThreads        FG  thrpt   30   3.112 ±  0.177  ops/us
+* */
+
+/*
+* "
+SkipListBench.eightThreads     JDK  avgt   30    0.544 ± 0.015  us/op
+SkipListBench.eightThreads     OPT  avgt   30    0.597 ± 0.025  us/op
+SkipListBench.eightThreads      FG  avgt   30    1.666 ± 0.051  us/op
+SkipListBench.fourThreads      JDK  avgt   30    0.421 ± 0.021  us/op
+SkipListBench.fourThreads      OPT  avgt   30    0.388 ± 0.014  us/op
+SkipListBench.fourThreads       FG  avgt   30    0.982 ± 0.036  us/op
+SkipListBench.twoThreads       JDK  avgt   30    0.339 ± 0.026  us/op
+SkipListBench.twoThreads       OPT  avgt   30    0.301 ± 0.020  us/op
+SkipListBench.twoThreads        FG  avgt   30    0.676 ± 0.031  us/op
 * */
 public class SkipListBench {
     private Set<Integer> set;

@@ -55,8 +55,8 @@ public class ListReadHeavyBench {
     public void setup() {
         set = switch (type) {
             case "LF_FR" -> new ConcurrentOrderedList<>();
-            case "LAZY" -> new LazyOptimisticList<>();
-            case "LAZY_COARSE" -> new LazyCoarseOptimisticList<>();
+            case "LAZY" -> new LazySyncList<>();
+            case "LAZY_COARSE" -> new LazyCoarseSyncList<>();
             case "LOCK" -> new LockedOrderedLL<>();
             default -> throw new IllegalArgumentException();
         };

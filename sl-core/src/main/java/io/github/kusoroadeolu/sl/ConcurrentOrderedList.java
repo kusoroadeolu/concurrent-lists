@@ -6,7 +6,6 @@ import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.LongAdder;
 
 //A lock free ordered linked singly linked list set
 // States - marked (linearization point for removal), null key (means the pred node has been logically fully deleted), next pointer marked as a tombstone (node is going to be unlinked, don't cas to it's next ptr)
@@ -63,15 +62,19 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
             var pred = l;
             var curr = pred.loNext();
             for (;;) {
-                if (curr.isDummy() && curr != l && curr != r) continue restartFromLeft;
-                if (!curr.isMarked() && compare(t, curr, l, r) == 0) return false;
-                if (curr.isMarked()) { //If curr is marked try to unlink
+
+                if (curr.isDummy() && curr != r) continue restartFromLeft; //Curr can never be left
+
+                if (curr.isMarked()) { //If curr is marked try to help unlink
                     curr = helpUnlink(pred, curr); //Only shift curr
                     continue;
                 }
-                if (compare(t, curr, l, r) > 0) {
-                    pred = curr; curr = pred.loNext();
-                } else {
+
+                int res;
+                if ((res = compare(t, curr, l, r)) == 0) return false;
+
+                if (res > 0) pred = curr;
+                else {
                     //Ensure we immediately set curr = next; backed by volatile write
                     node.spNext(curr);
                     if (pred.casNext(curr, node)) { //Linearization point
@@ -79,9 +82,12 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
                     }
                     //Move backwards, don't change pred, two things could've happened, pred was deleted (its dummy tombstone was introduced) or a new node greater than pred was added
 
-                    if (pred.isMarked()) continue restartFromLeft;
-                    else curr = pred.loNext();
+                    //Here we could rather just move to next rather than checking if pred is marked
+                    //If pred is marked, worst case scenario is that pred's tombstone has been inserted, and we have to restart from left on the next loop iteration
+
                 }
+
+                curr = pred.loNext();
 
             }
         }
@@ -100,17 +106,21 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
         restartFromLeft: for (; ;) {
             var pred = l;
             var curr = pred.loNext();
+
             while (true) {
-                if (!curr.isMarked() && compare(t, curr, l, r) < 0) return false;
+                if (curr.isDummy() && curr != r)
+                    continue restartFromLeft; //If we find a dummy node, restart from left
 
-                if (curr.isDummy() && curr != l) continue restartFromLeft; //If we find a dummy node, restart from left
-
-                if (curr.isMarked() && !curr.isDummy()) {
+                if (curr.isMarked()) {
                     curr = helpUnlink(pred, curr);
                     continue;
                 }
 
-                if (compare(t, curr, l, r) == 0) {
+                int res;
+                if ((res = compare(t, curr, l, r)) < 0) return false;
+
+
+                if (res == 0) {
                     if (curr.casMarked()) {
                         helpUnlink(pred, curr);
                         return true;
@@ -164,12 +174,10 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
         var l = left;
         var r = right;
         var curr = l.loNext();
+        int res;
         for (;;) {
-            int res = 0;
-            if (curr == r) return false; //If we've reached the end of the list
-            else if (!curr.isMarked() && (res = compare(t, curr, l, r)) == 0) return true;
-            else if (curr.isMarked() || res > 0) curr = curr.loNext();
-            else return false;
+            if (curr.isMarked() || (res = compare(t, curr, l, r)) > 0) curr = curr.loNext();
+            else return res == 0;
         }
     }
 

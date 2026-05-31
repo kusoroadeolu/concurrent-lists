@@ -8,12 +8,12 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 //So similar to the lazy optimistic list, but instead we just use a fat lock instead of a lock per node
-public class LazyCoarseOptimisticList<T extends Comparable<T>> implements ConcurrentListSet<T>{
+public class LazyCoarseSyncList<T extends Comparable<T>> implements ConcurrentListSet<T>{
     private final Node<T> left;
     private final Node<T> right;
     private final Lock lock;
 
-    public LazyCoarseOptimisticList() {
+    public LazyCoarseSyncList() {
         this.left = new Node<>(null);
         this.right = new Node<>(null);
         lock = new ReentrantLock();
