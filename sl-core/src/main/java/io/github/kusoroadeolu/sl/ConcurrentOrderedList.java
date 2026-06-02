@@ -3,9 +3,7 @@ package io.github.kusoroadeolu.sl;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 //A lock free ordered linked singly linked list set
 // States - marked (linearization point for removal), null key (means the pred node has been logically fully deleted), next pointer marked as a tombstone (node is going to be unlinked, don't cas to it's next ptr)
@@ -62,8 +60,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
             var pred = l;
             var curr = pred.loNext();
             for (;;) {
-
-                if (curr.isDummy() && curr != r) continue restartFromLeft; //Curr can never be left
+                if (curr.isDummy()) continue restartFromLeft; //Curr can never be left
 
                 if (curr.isMarked()) { //If curr is marked try to help unlink
                     curr = helpUnlink(pred, curr); //Only shift curr
@@ -108,7 +105,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
             var curr = pred.loNext();
 
             while (true) {
-                if (curr.isDummy() && curr != r)
+                if (curr.isDummy())
                     continue restartFromLeft; //If we find a dummy node, restart from left
 
                 if (curr.isMarked()) {
@@ -176,8 +173,9 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
         var curr = l.loNext();
         int res;
         for (;;) {
-            if (curr.isMarked() || (res = compare(t, curr, l, r)) > 0) curr = curr.loNext();
-            else return res == 0;
+            var isDummy = curr.isDummy();
+            if (isDummy || (res = compare(t, curr, l, r)) > 0) curr = curr.loNext();
+            else return res == 0 && !curr.isMarked();
         }
     }
 
@@ -219,20 +217,10 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
         return t.compareTo(curr.t);
     }
 
-    boolean isLeftOrRight(Node<T> node, Node<T> l, Node<T> r) {
-        return isNode(node, l) || isNode(node, r);
-    }
-
-    boolean isNode(Node<T> node, Node<T> n) {
-        return node == n;
-    }
-
-
-
     private static class Node<T extends Comparable<T>> {
         private final T t;
         private volatile boolean marked;
-        private volatile Node<T> next;
+        volatile Node<T> next;
 
         public Node(T t) {
             this.t = t;
@@ -276,7 +264,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
 
         @Override
         public String toString() {
-            return t.toString();
+            return t.toString() + " -> " + next.toString();
         }
     }
 
@@ -296,11 +284,14 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
             NEXT.setRelease(this, next);
         }
 
-
+        @Override
+        boolean isDummy() {
+            return false;
+        }
 
         @Override
         public String toString() {
-            return "LeftNode";
+            return "LeftNode -> " + next.toString();
         }
 
 
@@ -314,6 +305,11 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
 
         public RightNode() {
             this(null, false, null);
+        }
+
+        @Override
+        boolean isDummy() {
+            return false;
         }
 
         @Override

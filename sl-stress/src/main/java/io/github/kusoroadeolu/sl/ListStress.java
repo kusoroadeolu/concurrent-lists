@@ -159,28 +159,6 @@ public class ListStress {
         }
     }
 
-    @JCStressTest(Mode.Termination)
-    @Outcome(id = "TERMINATED", expect = ACCEPTABLE,             desc = "Gracefully finished")
-    @Outcome(id = "STALE",      expect = ACCEPTABLE_INTERESTING, desc = "Test is stuck")
-    @State
-    public static class LockBasedReads {
-         boolean ready = false;
-         private Lock lock = new ReentrantLock();
 
-        @Actor
-        public void actor() {
-            while (!ready);
-        }
-
-        @Signal
-        public void signaller() {
-            lock.lock();
-            try {
-                ready = true;
-            }finally {
-                lock.unlock();
-            }
-        }
-    }
 
 }

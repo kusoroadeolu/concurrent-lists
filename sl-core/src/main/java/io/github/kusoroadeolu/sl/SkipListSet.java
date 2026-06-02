@@ -405,13 +405,4 @@ public class SkipListSet<T extends Comparable<T>> implements Set<T> {
         }
 
     }
-
-
-
-
-    static void main() {
-        var set = new SkipListSet<Integer>(5);
-        for (int i = 10; i > 0; --i) set.add(i);
-        IO.println(set);
-    }
 }

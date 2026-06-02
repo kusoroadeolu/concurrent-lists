@@ -3,6 +3,10 @@ package io.github.kusoroadeolu.sl.jmh;
 import io.github.kusoroadeolu.sl.*;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
+import org.openjdk.jmh.profile.JavaFlightRecorderProfiler;
+import org.openjdk.jmh.runner.RunnerException;
+import org.openjdk.jmh.runner.options.Options;
+import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -11,15 +15,15 @@ import java.util.concurrent.TimeUnit;
 
 /*
 * Benchmark                              (type)   Mode  Cnt  Score    Error   Units
-ListWriteHeavyBench.eightThreads        LF_FR  thrpt   30  0.125 ±  0.003  ops/us
+ListWriteHeavyBench.eightThreads         LF_FR  thrpt   30  0.153 ± 0.007  ops/us
 ListWriteHeavyBench.eightThreads         LAZY  thrpt   30  0.143 ±  0.004  ops/us
 ListWriteHeavyBench.eightThreads         LOCK  thrpt   30  0.026 ±  0.001  ops/us
 ListWriteHeavyBench.eightThreads  LAZY_COARSE  thrpt   30  0.147 ±  0.002  ops/us
-ListWriteHeavyBench.fourThreads         LF_FR  thrpt   30  0.082 ±  0.003  ops/us
+ListWriteHeavyBench.fourThreads          LF_FR  thrpt   30  0.080 ± 0.003  ops/us
 ListWriteHeavyBench.fourThreads          LAZY  thrpt   30  0.081 ±  0.002  ops/us
 ListWriteHeavyBench.fourThreads          LOCK  thrpt   30  0.026 ±  0.001  ops/us
 ListWriteHeavyBench.fourThreads   LAZY_COARSE  thrpt   30  0.083 ±  0.004  ops/us
-ListWriteHeavyBench.twoThreads          LF_FR  thrpt   30  0.052 ±  0.002  ops/us
+ListWriteHeavyBench.twoThreads           LF_FR  thrpt   30  0.043 ± 0.001  ops/us
 ListWriteHeavyBench.twoThreads           LAZY  thrpt   30  0.053 ±  0.002  ops/us
 ListWriteHeavyBench.twoThreads           LOCK  thrpt   30  0.029 ±  0.001  ops/us
 ListWriteHeavyBench.twoThreads    LAZY_COARSE  thrpt   30  0.054 ±  0.002  ops/us
@@ -27,21 +31,21 @@ ListWriteHeavyBench.twoThreads    LAZY_COARSE  thrpt   30  0.054 ±  0.002  ops/
 
 /*
 * Benchmark                              (type)  Mode  Cnt    Score    Error  Units
-ListWriteHeavyBench.eightThreads        LF_FR  avgt   30   57.631 ±  1.021  us/op
+ListWriteHeavyBench.eightThreads         LF_FR  avgt   30  51.434 ± 0.890  us/op
 ListWriteHeavyBench.eightThreads         LAZY  avgt   30   54.703 ±  1.227  us/op
 ListWriteHeavyBench.eightThreads         LOCK  avgt   30  322.620 ± 20.590  us/op
 ListWriteHeavyBench.eightThreads  LAZY_COARSE  avgt   30   52.474 ±  1.720  us/op
-ListWriteHeavyBench.fourThreads         LF_FR  avgt   30   46.756 ±  1.750  us/op
+ListWriteHeavyBench.fourThreads          LF_FR  avgt   30  51.607 ± 2.077  us/op
 ListWriteHeavyBench.fourThreads          LAZY  avgt   30   45.701 ±  1.228  us/op
 ListWriteHeavyBench.fourThreads          LOCK  avgt   30  153.047 ±  1.507  us/op
 ListWriteHeavyBench.fourThreads   LAZY_COARSE  avgt   30   45.808 ±  1.560  us/op
-ListWriteHeavyBench.twoThreads          LF_FR  avgt   30   37.604 ±  1.490  us/op
+ListWriteHeavyBench.twoThreads           LF_FR  avgt   30  46.381 ± 1.604  us/op
 ListWriteHeavyBench.twoThreads           LAZY  avgt   30   37.030 ±  1.524  us/op
 ListWriteHeavyBench.twoThreads           LOCK  avgt   30   68.582 ±  1.676  us/op
 ListWriteHeavyBench.twoThreads    LAZY_COARSE  avgt   30   36.923 ±  1.415  us/op
 * */
 
-@BenchmarkMode(Mode.AverageTime)
+@BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 @Warmup(iterations = 10, time = 1)
@@ -49,13 +53,13 @@ ListWriteHeavyBench.twoThreads    LAZY_COARSE  avgt   30   36.923 ±  1.415  us/
 @Fork(3)
 public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     private ConcurrentListSet<Integer> set;
-    @Param({"LF_FR", "LAZY", "LOCK", "LAZY_COARSE"}) //LOCK FREE, LAZY and a lock based tree set
+    @Param({"LF_FR" /*"LAZY", "LOCK", "LAZY_COARSE"*/}) //LOCK FREE, LAZY and a lock based tree set
     private String type;
 
     @Setup
     public void setup() {
         set = switch (type) {
-            case "LF_FR" -> new ConcurrentOrderedList<>();
+            case "LF_FR" -> new UnrolledConcurrentList<>();
             case "LAZY" -> new LazySyncList<>();
             case "LAZY_COARSE" -> new LazyCoarseSyncList<>();
             case "LOCK" -> new LockedOrderedLL<>();
@@ -104,5 +108,14 @@ public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
         } else{
             bh.consume(set.contains(key));
         }
+    }
+
+    static class BenchRunner {
+        static void main() throws RunnerException {
+            Options options = new OptionsBuilder()
+                    .include(ListWriteHeavyBench.class.getSimpleName())
+                    .addProfiler(JavaFlightRecorderProfiler.class, "dir=C:\\jfr-sl")
+                    .build();
+            new org.openjdk.jmh.runner.Runner(options).run();        }
     }
 }
