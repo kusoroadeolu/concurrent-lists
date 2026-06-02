@@ -25,7 +25,16 @@ import java.util.concurrent.locks.ReentrantLock;
 * as a thread traversing through a thread will always have to read a node's next flag to get to its dest
 *
 * Also, a node's next flag is always protected by its pred node
+*
+* To allow threads holding the lock less, while the compiler can optimize loops,
+* on removes we try to pack the lower most index regions of the arrays with values,
+*  though at the cost of reads starting from the higher most index values
+* To prevent modifications on nodes who we're splitting or redistributing their arrays,
+* we first copy their arrays before any operation, while this might seem expensive, we are just paying for the cost of a new array object,
+* pre-existing objects are not copied
 * */
+
+@SuppressWarnings("unchecked")
 public class UnrolledConcurrentList<T extends Comparable<T>> implements ConcurrentListSet<T>{
     private final Node<T> left;
     private final Node<T> right;
@@ -149,17 +158,16 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                 nullifyIndex(index, curr);
                 int size = --curr.size;
                 if (size > minFull) return true;
-
                 curr.lock();
                 try {
                     var succ = curr.lpNext();
-                    if (succ == r) return true;
-                    else if (size == 0) {
-
+                    if (size == 0) {
                         pred.soNext(succ);
                         curr.soMarked();
                         return true;
                     }
+
+                    if (succ == r) return true;
 
                     succ.lock(); //Ensure we lock succ to prevent other threads from making structural modifications to its array
                     try {
@@ -190,6 +198,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
     }
 
     void redistribute(Node<T> curr, Node<T> succ, int total) {
+
         Object[] copy = Arrays.stream(succ.array.clone())
                 .filter(Objects::nonNull)
                 .toArray();
@@ -213,6 +222,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         node.spNext(succ.lpNext());
         curr.soNext(node); //Write to node will make all the writes in the node array visible
         succ.soMarked();
+
     }
 
     void merge(Node<T> curr, Node<T> succ, int[] indexes) {
@@ -343,13 +353,6 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         return 1;
     }
 
-
-
-    int compare(T t ,Node<T> r, Node<T> curr) {
-        if (curr == r) return -1;
-        return t.compareTo(curr.anchor);
-    }
-
     static class Node<T extends Comparable<T>> {
         final T anchor;
         final Object[] array;
@@ -471,7 +474,21 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
     @Override
     public List<T> toList() {
-        return List.of();
+        var l = left;
+        var r = right;
+        var curr = l.loNext();
+        List<T> ls = new ArrayList<>();
+        while (curr != r) {
+            var arr = curr.array.clone();
+            for (int i = 0; i < arrayCap; ++i) {
+                T t = (T) arr[i];
+                if (t != null) ls.add(t);
+            }
+
+            curr = curr.loNext();
+        }
+
+        return ls;
     }
 
 
@@ -484,22 +501,5 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-
-    /*
-     * Total = 9
-     * curr.size = 2;
-     * succ.size = 7;
-     *
-     * nodecount =  9 / 2 = 5
-     * tomove = 7 - 5 = 2;
-     * */
-
-    static void main() {
-        var ls = new UnrolledConcurrentList<Integer>(2, 1);
-        ls.add(2);
-        ls.add(1);
-        System.out.println(ls.nodeMap());
     }
 }

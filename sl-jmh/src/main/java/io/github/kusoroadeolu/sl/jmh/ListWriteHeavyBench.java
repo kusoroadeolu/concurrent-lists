@@ -45,7 +45,19 @@ ListWriteHeavyBench.twoThreads           LOCK  avgt   30   68.582 ±  1.676  us/
 ListWriteHeavyBench.twoThreads    LAZY_COARSE  avgt   30   36.923 ±  1.415  us/op
 * */
 
-@BenchmarkMode(Mode.Throughput)
+/*
+* Benchmark                           (type)   Mode  Cnt  Score   Error   Units
+ListWriteHeavyBench.eightThreads  UNROLLED  thrpt   30  1.017 ± 0.027  ops/us
+ListWriteHeavyBench.fourThreads   UNROLLED  thrpt   30  0.635 ± 0.008  ops/us
+ListWriteHeavyBench.twoThreads    UNROLLED  thrpt   30  0.398 ± 0.017  ops/us
+*
+* Benchmark                           (type)  Mode  Cnt  Score   Error  Units
+ListWriteHeavyBench.eightThreads  UNROLLED  avgt   30  7.675 ± 0.358  us/op
+ListWriteHeavyBench.fourThreads   UNROLLED  avgt   30  6.278 ± 0.130  us/op
+ListWriteHeavyBench.twoThreads    UNROLLED  avgt   30  5.058 ± 0.214  us/op
+* */
+
+@BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 @Warmup(iterations = 10, time = 1)
@@ -53,13 +65,13 @@ ListWriteHeavyBench.twoThreads    LAZY_COARSE  avgt   30   36.923 ±  1.415  us/
 @Fork(3)
 public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     private ConcurrentListSet<Integer> set;
-    @Param({"LF_FR" /*"LAZY", "LOCK", "LAZY_COARSE"*/}) //LOCK FREE, LAZY and a lock based tree set
+    @Param({"UNROLLED" /*"LAZY", "LOCK", "LAZY_COARSE"*/}) //LOCK FREE, LAZY and a lock based tree set
     private String type;
 
     @Setup
     public void setup() {
         set = switch (type) {
-            case "LF_FR" -> new UnrolledConcurrentList<>();
+            case "UNROLLED" -> new UnrolledConcurrentList<>();
             case "LAZY" -> new LazySyncList<>();
             case "LAZY_COARSE" -> new LazyCoarseSyncList<>();
             case "LOCK" -> new LockedOrderedLL<>();
@@ -77,6 +89,7 @@ public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
 
         ls.clear();
     }
+
 
     @Threads(2)
     @Benchmark

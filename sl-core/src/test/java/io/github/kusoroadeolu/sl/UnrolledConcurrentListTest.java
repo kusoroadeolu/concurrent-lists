@@ -368,5 +368,29 @@ class UnrolledConcurrentListTest {
             }
         }
     }
+
+    @Nested
+    @DisplayName("Edge cases in merge/redistribute")
+    class MergeEdgeCases {
+
+        @Test
+        @DisplayName("Merge when succ.size is zero crashes findEmptyIndexes")
+        void mergeWithZeroSizedSucc() {
+            var list = new UnrolledConcurrentList<Integer>(4, 2);
+            // Build two nodes: [1,2,3,4] and [5,6,7,8]
+            for (int i = 1; i <= 8; i++) list.add(i);
+
+            // Drain succ completely first (without triggering its own merge/unlink)
+            // then drain curr below minFull so it tries to merge into an empty succ
+            list.remove(5);
+            list.remove(6);
+            list.remove(7);
+            list.remove(8); // succ.size = 0 but may still be linked
+            list.remove(3); // curr.size drops to minFull, tries to merge with zombie succ
+            list.remove(4);
+
+            assertAllInvariants(list);
+        }
+    }
 }
 
