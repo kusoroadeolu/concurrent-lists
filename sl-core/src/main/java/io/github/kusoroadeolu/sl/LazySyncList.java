@@ -9,7 +9,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 // Based on the paper https://www.researchgate.net/publication/220440170_A_Lazy_Concurrent_List-Based_Set_Algorithm
 /* The code is quite easy to reason about
-* The main idea of the paper is we lazily acquire locks, traversing the list on modification operations only acquiring locks for nodes when we want to modify them
+* The main idea of the paper is we optimistically scan for a window where two nodes might operate before we acquire locks.
+* To propagate deletes before the actual unlinking happens, we lazily mark nodes as deleted, so threads waiting upon those nodes will validate and retry if needed
 * Read operations however are wait free, as threads need not acquire locks during traversal and visibility is ensured by happens before guarantee of locks
 *
 * A simple optimization made in this impl is validation the state of a node before acquiring the node locks

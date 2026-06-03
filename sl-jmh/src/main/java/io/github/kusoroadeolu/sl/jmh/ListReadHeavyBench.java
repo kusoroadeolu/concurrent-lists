@@ -41,16 +41,17 @@ ListReadHeavyBench.twoThreads           LOCK  avgt   30  157.357 ± 16.030  us/o
 ListReadHeavyBench.twoThreads    LAZY_COARSE  avgt   30   79.521 ±  3.725  us/op
 * */
 
+
 /*
-* Benchmark                          (type)   Mode  Cnt  Score   Error   Units
-ListReadHeavyBench.eightThreads  UNROLLED  thrpt   30  0.364 ± 0.010  ops/us
-ListReadHeavyBench.fourThreads   UNROLLED  thrpt   30  0.284 ± 0.009  ops/us
-ListReadHeavyBench.twoThreads    UNROLLED  thrpt   30  0.211 ± 0.011  ops/us
+* Benchmark                          (type)   Mode  Cnt   Score   Error   Units
+ListReadHeavyBench.eightThreads  UNROLLED  thrpt   30  10.253 ± 0.356  ops/us
+ListReadHeavyBench.fourThreads   UNROLLED  thrpt   30  11.161 ± 0.568  ops/us
+ListReadHeavyBench.twoThreads    UNROLLED  thrpt   30  11.579 ± 0.765  ops/us
 *
-* Benchmark                          (type)  Mode  Cnt   Score   Error  Units
-ListReadHeavyBench.eightThreads  UNROLLED  avgt   30  20.949 ± 0.766  us/op
-ListReadHeavyBench.fourThreads   UNROLLED  avgt   30  13.526 ± 0.405  us/op
-ListReadHeavyBench.twoThreads    UNROLLED  avgt   30   9.358 ± 0.403  us/op
+Benchmark                          (type)  Mode  Cnt  Score   Error  Units
+ListReadHeavyBench.eightThreads  UNROLLED  avgt   30  0.654 ± 0.027  us/op
+ListReadHeavyBench.fourThreads   UNROLLED  avgt   30  0.340 ± 0.018  us/op
+ListReadHeavyBench.twoThreads    UNROLLED  avgt   30  0.133 ± 0.009  us/op
 * */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -61,12 +62,13 @@ ListReadHeavyBench.twoThreads    UNROLLED  avgt   30   9.358 ± 0.403  us/op
 public class ListReadHeavyBench {
     private ConcurrentListSet<Integer> set;
 
-    @Param({"UNROLLED" /*"LAZY", "LOCK", "LAZY_COARSE"*/})
+    @Param({"UNROLLED", "LF_FR", "LAZY", "LOCK", "LAZY_COARSE"})
     private String type;
 
     @Setup
     public void setup() {
         set = switch (type) {
+            case "LF_FR" -> new ConcurrentOrderedList<>();
             case "UNROLLED" -> new UnrolledConcurrentList<>();
             case "LAZY" -> new LazySyncList<>();
             case "LAZY_COARSE" -> new LazyCoarseSyncList<>();

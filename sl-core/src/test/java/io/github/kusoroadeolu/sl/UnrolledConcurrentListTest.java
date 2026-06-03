@@ -23,10 +23,6 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class UnrolledConcurrentListTest {
 
-    // -----------------------------------------------------------------------
-    // Helpers — reach into nodeMap() / anchorList() to inspect internal state
-    // -----------------------------------------------------------------------
-
     /**
      * I1: anchors must be strictly ascending across the live node list.
      */
@@ -251,20 +247,19 @@ class UnrolledConcurrentListTest {
         @Test
         @DisplayName("Interleaved add/remove — surviving keys are reachable")
         void interleavedAddRemove() {
-            var list = new UnrolledConcurrentList<Integer>(4, 2);
+            var list = new UnrolledConcurrentList<Integer>();
             Set<Integer> alive = new HashSet<>();
 
-            for (int i = 1; i <= 10; i++) {
+            for (int i = 1; i <= 30; i++) {
                 list.add(i);
                 alive.add(i);
             }
-            System.out.println("Nodemap: " + list.nodeMap());
-            for (int i = 1; i <= 10; i += 2) { // remove odds
+
+            for (int i = 1; i <= 30; i += 2) { // remove odds
                 list.remove(i);
                 alive.remove(i);
             }
 
-            System.out.println("Nodemap: " + list.nodeMap());
 
             assertAllInvariants(list);
             for (int v : alive) {
@@ -362,7 +357,6 @@ class UnrolledConcurrentListTest {
             list.remove(2);
 
             assertAllInvariants(list);
-            System.out.println(list.nodeMap());
             for (int i = 3; i <= 8; i++) {
                 assertTrue(list.contains(i), "key " + i + " lost during redistribute");
             }
@@ -390,6 +384,30 @@ class UnrolledConcurrentListTest {
             list.remove(4);
 
             assertAllInvariants(list);
+        }
+    }
+
+    @Nested
+    class NullStress {
+        @Test
+        void testChurnedSplit() {
+            UnrolledConcurrentList<Integer> list = new UnrolledConcurrentList<>();
+            Random rng = new Random(42);
+
+            // Churn within a small key range to replicate benchmark conditions
+            for (int i = 0; i < 1_000_000; i++) {
+                int key = rng.nextInt(200); // small range = high collision = heavy churn per node
+                int op = rng.nextInt(100);
+                if (op < 50) {
+                    assertDoesNotThrow(() -> list.add(key));
+                } else if (op < 90) {
+                    list.remove(key);
+                } else {
+                    list.contains(key);
+                }
+            }
+
+            System.out.println("Node: " + list.nodeMap());
         }
     }
 }

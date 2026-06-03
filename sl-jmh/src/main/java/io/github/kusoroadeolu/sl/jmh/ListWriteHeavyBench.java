@@ -45,16 +45,16 @@ ListWriteHeavyBench.twoThreads           LOCK  avgt   30   68.582 ±  1.676  us/
 ListWriteHeavyBench.twoThreads    LAZY_COARSE  avgt   30   36.923 ±  1.415  us/op
 * */
 
-/*
-* Benchmark                           (type)   Mode  Cnt  Score   Error   Units
-ListWriteHeavyBench.eightThreads  UNROLLED  thrpt   30  1.017 ± 0.027  ops/us
-ListWriteHeavyBench.fourThreads   UNROLLED  thrpt   30  0.635 ± 0.008  ops/us
-ListWriteHeavyBench.twoThreads    UNROLLED  thrpt   30  0.398 ± 0.017  ops/us
-*
-* Benchmark                           (type)  Mode  Cnt  Score   Error  Units
-ListWriteHeavyBench.eightThreads  UNROLLED  avgt   30  7.675 ± 0.358  us/op
-ListWriteHeavyBench.fourThreads   UNROLLED  avgt   30  6.278 ± 0.130  us/op
-ListWriteHeavyBench.twoThreads    UNROLLED  avgt   30  5.058 ± 0.214  us/op
+/* ArraySize Per Node = 64
+Benchmark                           (type)   Mode  Cnt  Score   Error   Units
+ListWriteHeavyBench.eightThreads  UNROLLED  thrpt   30  3.644 ± 0.075  ops/us
+ListWriteHeavyBench.fourThreads   UNROLLED  thrpt   30  3.702 ± 0.069  ops/us
+ListWriteHeavyBench.twoThreads    UNROLLED  thrpt   30  5.402 ± 0.260  ops/us
+
+Benchmark                           (type)  Mode  Cnt  Score   Error  Units
+ListWriteHeavyBench.eightThreads  UNROLLED  avgt   30  1.823 ± 0.037  us/op
+ListWriteHeavyBench.fourThreads   UNROLLED  avgt   30  0.915 ± 0.018  us/op
+ListWriteHeavyBench.twoThreads    UNROLLED  avgt   30  0.296 ± 0.008  us/op
 * */
 
 @BenchmarkMode(Mode.AverageTime)
@@ -65,12 +65,14 @@ ListWriteHeavyBench.twoThreads    UNROLLED  avgt   30  5.058 ± 0.214  us/op
 @Fork(3)
 public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     private ConcurrentListSet<Integer> set;
-    @Param({"UNROLLED" /*"LAZY", "LOCK", "LAZY_COARSE"*/}) //LOCK FREE, LAZY and a lock based tree set
+
+    @Param({"UNROLLED", "LF_FR", "LAZY", "LOCK", "LAZY_COARSE"})
     private String type;
 
     @Setup
     public void setup() {
         set = switch (type) {
+            case "LF_FR" -> new ConcurrentOrderedList<>();
             case "UNROLLED" -> new UnrolledConcurrentList<>();
             case "LAZY" -> new LazySyncList<>();
             case "LAZY_COARSE" -> new LazyCoarseSyncList<>();
@@ -91,9 +93,9 @@ public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     }
 
 
-    @Threads(2)
+    @Threads(8)
     @Benchmark
-    public void twoThreads(Blackhole bh) {
+    public void eightThreads(Blackhole bh) {
         doWork(bh);
     }
 
@@ -103,9 +105,10 @@ public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
         doWork(bh);
     }
 
-    @Threads(8)
+
+    @Threads(2)
     @Benchmark
-    public void eightThreads(Blackhole bh) {
+    public void twoThreads(Blackhole bh) {
         doWork(bh);
     }
 
