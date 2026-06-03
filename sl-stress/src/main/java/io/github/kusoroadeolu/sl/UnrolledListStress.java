@@ -5,6 +5,8 @@ import org.openjdk.jcstress.infra.results.I_Result;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 import java.util.stream.IntStream;
 
 import static org.openjdk.jcstress.annotations.Expect.ACCEPTABLE;
@@ -100,6 +102,14 @@ public class UnrolledListStress {
             }
 
             r.r1 = isLess ? 1 : 0;
+        }
+
+        public void doWork(){
+            int key = ThreadLocalRandom.current().nextInt(10_000);
+            int op = ThreadLocalRandom.current().nextInt(100);
+
+            if (op < 50) set.add(key);
+            else set.remove(key);
         }
     }
 }

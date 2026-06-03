@@ -108,7 +108,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                     var succ = curr.lpNext();
                     var arr = curr.array;
                     try {
-                        split(arr ,nodes, s);
+                        split(arr ,nodes);
                         var n1 = nodes[0];
                         var n2 = nodes[1];
 
@@ -229,14 +229,9 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         return -1;
     }
 
-    void split(Object[] array ,Node<T>[] nodes, int size) {
+    void split(Object[] array ,Node<T>[] nodes) {
         Object[] copy = array.clone(); //Copy to prevent modifying the initial array
-        try {
-            Arrays.sort(copy);
-        }catch (Exception e) {
-            System.out.println("Size: %s, Copy: %s".formatted(size, Arrays.toString(array)));
-            throw e;
-        }
+        Arrays.sort(copy);
         Object[] arr1 = new Object[arrayCap];
         Object[] arr2 = new Object[arrayCap];
 
@@ -374,7 +369,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
     }
 
 
-    void valueIndexAndSize(T t, Node<T> curr, int[] indices, Operation op){
+    void valueIndexAndSize(T t, Node<T> curr, int[] indices, Operation op) {
         if (curr == right) {
             indices[0] = -1;
             indices[1] = 0;
@@ -398,6 +393,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
         indices[1] = size;
     }
+
 
 
 
