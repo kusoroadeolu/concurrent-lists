@@ -15,16 +15,16 @@ import java.util.concurrent.locks.ReentrantLock;
 * Invariants:
 * The anchor of a node successor must be greater than its predecessor
 * All keys in a node are greater than or equal to that node’s anchor key
+* Null elements cannot be added to this list
 *
 *
 * Note that there is no guarantee in which the anchor of a node will always exist in the node
-* There is also no guarantee that the array in a node is will always be in sorted order
+* There is also no guarantee that the array in a node is will always be in sorted order as to keep the array in sorted order will penalize write perf
 *
+* A node's next flag is always protected by its pred node
 * Communication across node to indicate a node is deleted is done mainly through a marked flag
 * Visibility during splits and merges is done using a set release write to a node's next pointer,
 * as a thread traversing through a thread will always have to read a node's next flag to get to its dest
-*
-* Also, a node's next flag is always protected by its pred node
 *
 * To allow threads holding the lock less, while the compiler can optimize loops,
 * on removes we try to pack the lower most index regions of the arrays with values,
@@ -72,6 +72,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
     }
 
     public boolean add(T t) {
+        Objects.requireNonNull(t);
         Node<T> r = right;
         int aCap = arrayCap;
         var localArrays = this.localArrays.get();
@@ -100,7 +101,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                 int idx = findAvailableIndex(curr);
 
                 if (s < aCap) {
-                    curr.soArray(idx, t);
+                    curr.soArray(idx, t); //Linearization point
                     return true;
                 } else { //Split
                     curr.lock(); //Lock to ensure no one can modify curr.next during the split
@@ -124,7 +125,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
                         n1.spNext(n2);
                         n2.spNext(succ);
-                        pred.soNext(n1); //Visibility
+                        pred.soNext(n1); //Linearization point
                         return true;
                     }finally {
                         curr.unlock();
@@ -138,7 +139,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
     }
 
     public boolean remove(Object o) {
-        T t = (T) o;
+        T t = (T) Objects.requireNonNull(o);
         Node<T> r = right;
         int aCap = arrayCap;
         var localArrays = this.localArrays.get();
@@ -163,7 +164,8 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                 try {
                     var succ = curr.lpNext();
                     if (currSize == 0) {
-                        curr.soMarked();
+                        curr.soMarked(); //Could we use a weaker mode for marked, maybe use the next write as a HB relationship. The issue though is
+                        //a thread has previously read prev and its next flag, it context switches, another thread adds and then marks
                         pred.soNext(succ);
                         return true;
                     }
@@ -200,7 +202,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
     }
 
     public boolean contains(Object o) {
-        T t = (T) o;
+        T t = (T) Objects.requireNonNull(o);
         var localArrays = this.localArrays.get();
         var nodes = localArrays.nodes();
         return isPresent(t, nodes);
@@ -239,8 +241,8 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         int rem = arrayCap - half;
         System.arraycopy(copy, 0, arr1, 0, half);
         System.arraycopy(copy, half, arr2, 0, rem);
-        nodes[0] = new Node<>(arr1, half);
-        nodes[1] = new Node<>(arr2, rem);
+        nodes[0] = new Node<>(arr1);
+        nodes[1] = new Node<>(arr2);
     }
 
     int findNonNullIndex(Object[] arr, int index) {
@@ -278,7 +280,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         int toMove = succSize - nodeCount;
         Arrays.sort(copy);
         var nodeArr = Arrays.copyOf(copy, arrayCap);
-        var node = new Node<>((T) nodeArr[toMove], nodeArr, nodeCount);
+        var node = new Node<>((T) nodeArr[toMove], nodeArr);
         for (int i = 0, j = 0; i < arrayCap; ++i) {
             if (j == toMove) break;
             if (curr.lpArray(i) == null) {
@@ -356,13 +358,12 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
     }
 
     boolean isPresent(T t, Node<T>[] nodes){
-        int found = findNode(t, nodes);
-        if (found == -1) return false;
+        if (!findNode(t, nodes)) return false;
         var curr = nodes[1];
-        for (int i = arrayCap - 1; i >= 0; --i) { //We need to traverse from r to l due to how deletes are structured
-            T v = curr.loArray(i);
-            if (v != null && t.compareTo(v) == 0) return !curr.loMarked();
 
+        for (int i = arrayCap - 1; i >= 0; --i) {
+            T v = curr.loArray(i);
+            if (v != null && t.compareTo(v) == 0) return true;
         }
 
         return false;
@@ -397,7 +398,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
 
 
-    int findNode(T t, Node<T>[] nodes) {
+    boolean findNode(T t, Node<T>[] nodes) {
         Node<T> l = left, r = right;
         Node<T> pred = l;
         Node<T> curr = l.loNext();
@@ -410,8 +411,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         }
 
         nodes[0] = pred; nodes[1] = curr;
-        if (curr == r) return -1;
-        return 1;
+        return curr == r || !curr.loMarked();
     }
 
     static class Node<T extends Comparable<T>> {
@@ -427,14 +427,14 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
             this.lock = new ReentrantLock();
         }
 
-        public Node(Object[] initialArray, int size) {
+        public Node(Object[] initialArray) {
             this.anchor = (T) initialArray[0];
             this.array = initialArray;
             this.lock = new ReentrantLock();
 
         }
 
-        public Node(T anchor, Object[] array, int size) {
+        public Node(T anchor, Object[] array) {
             this.anchor = anchor;
             this.array = array;
             this.lock = new ReentrantLock();
@@ -517,7 +517,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
     static class SentinelNode<T extends Comparable<T>> extends Node<T>{
 
         public SentinelNode() {
-            super(null, null, 0);
+            super(null, null);
         }
 
         @Override
