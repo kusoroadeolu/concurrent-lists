@@ -60,7 +60,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
             var pred = l;
             var curr = pred.loNext();
             for (;;) {
-                if (curr.isDummy()) continue restartFromLeft; //Curr can never be left
+                if (curr.isDummy()) continue restartFromLeft; // We need to restart from left, here, we could keep traversing forward ideally, if pred < t
 
                 if (curr.isMarked()) { //If curr is marked try to help unlink
                     curr = helpUnlink(pred, curr); //Only shift curr

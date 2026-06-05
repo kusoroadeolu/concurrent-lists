@@ -206,6 +206,7 @@ class UnrolledConcurrentListTest {
             var list = new UnrolledConcurrentList<Integer>(4, 2);
             List<Integer> inserted = IntStream.rangeClosed(1, 40).boxed().toList();
             inserted.forEach(list::add);
+            System.out.println(list.nodeMap());
 
             assertAllInvariants(list);
             for (int v : inserted) {

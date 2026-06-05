@@ -6,7 +6,6 @@ import org.openjdk.jcstress.infra.results.I_Result;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 import java.util.stream.IntStream;
 
 import static org.openjdk.jcstress.annotations.Expect.ACCEPTABLE;
@@ -17,28 +16,35 @@ public class UnrolledListStress {
     @State
     public static class OrderedAnchorStress {
         public  UnrolledConcurrentList<Integer> set;
+        final int bound = 20;
 
         public OrderedAnchorStress() {
-            this.set = new UnrolledConcurrentList<>(2, 1);
+            this.set = new UnrolledConcurrentList<>(4, 1);
         }
 
 
         @Actor
         public void actor() {
-            set.add(2);
-            set.remove(3);
+            doWork();
         }
 
         @Actor
         public void actor2() {
-            set.add(3);
-            set.add(4);
+            doWork();
         }
 
         @Actor
         public void actor3() {
-            set.remove(2);
-            set.add(5);
+            doWork();
+        }
+
+        void doWork() {
+            for (int i = 0; i <= 5; ++i) {
+                boolean add = ThreadLocalRandom.current().nextInt() % 2 == 0;
+                if (add) {
+                    set.add(ThreadLocalRandom.current().nextInt(bound));
+                }else set.remove(ThreadLocalRandom.current().nextInt(bound));
+            }
         }
 
 
@@ -58,28 +64,34 @@ public class UnrolledListStress {
     @State
     public static class AnchorInvariantStress {
         public  UnrolledConcurrentList<Integer> set;
-
+        final int bound = 20;
         public AnchorInvariantStress() {
-            this.set = new UnrolledConcurrentList<>(2, 1);
+            this.set = new UnrolledConcurrentList<>(4, 1);
         }
 
 
         @Actor
         public void actor() {
-            set.add(2);
-            set.remove(3);
+            doWork();
         }
 
         @Actor
         public void actor2() {
-            set.add(3);
-            set.add(4);
+            doWork();
         }
 
         @Actor
         public void actor3() {
-            set.remove(2);
-            set.add(5);
+            doWork();
+        }
+
+        void doWork() {
+            for (int i = 0; i <= 5; ++i) {
+                boolean add = ThreadLocalRandom.current().nextInt() % 2 == 0;
+                if (add) {
+                    set.add(ThreadLocalRandom.current().nextInt(bound));
+                }else set.remove(ThreadLocalRandom.current().nextInt(bound));
+            }
         }
 
 
@@ -102,14 +114,7 @@ public class UnrolledListStress {
             }
 
             r.r1 = isLess ? 1 : 0;
-        }
-
-        public void doWork(){
-            int key = ThreadLocalRandom.current().nextInt(10_000);
-            int op = ThreadLocalRandom.current().nextInt(100);
-
-            if (op < 50) set.add(key);
-            else set.remove(key);
+            if (!isLess) System.out.println("Node map: " + map);
         }
     }
 }

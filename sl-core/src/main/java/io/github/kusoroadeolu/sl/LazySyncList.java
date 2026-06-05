@@ -101,8 +101,9 @@ public class LazySyncList<T extends Comparable<T>> implements ConcurrentListSet<
                 try {
                     curr.lock();
                     if (curr.lpMarked()) return false;
-                    curr.soMarked();
+
                     pred.soNext(curr.lpNext()); //Order here matters, we need to ensure node#next is set before we link pred to node
+                    curr.soMarked();
                     return true;
                 }finally {
                     curr.unlock();
