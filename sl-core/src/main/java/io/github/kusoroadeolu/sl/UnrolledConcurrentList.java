@@ -213,7 +213,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
             curr = nodes[1];
         } while (curr.loMarked());
 
-        if (curr == right) return false;
+        if (curr == right  || curr.anchor.compareTo(t) > 0) return false;
 
         for (int i = arrayCap - 1; i >= 0; --i) {
             T v = curr.loArray(i);

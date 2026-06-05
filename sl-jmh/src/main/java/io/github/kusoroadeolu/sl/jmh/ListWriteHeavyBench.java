@@ -47,14 +47,14 @@ ListWriteHeavyBench.twoThreads    LAZY_COARSE  avgt   30   36.923 ±  1.415  us/
 
 /* ArraySize Per Node = 64
 Benchmark                           (type)   Mode  Cnt  Score   Error   Units
-ListWriteHeavyBench.eightThreads  UNROLLED  thrpt   30  3.644 ± 0.075  ops/us
-ListWriteHeavyBench.fourThreads   UNROLLED  thrpt   30  3.702 ± 0.069  ops/us
-ListWriteHeavyBench.twoThreads    UNROLLED  thrpt   30  5.402 ± 0.260  ops/us
+ListWriteHeavyBench.eightThreads  UNROLLED  thrpt   30  3.871 ± 0.056  ops/us
+ListWriteHeavyBench.fourThreads   UNROLLED  thrpt   30  2.512 ± 0.043  ops/us
+ListWriteHeavyBench.twoThreads    UNROLLED  thrpt   30  1.706 ± 0.079  ops/us
 
 Benchmark                           (type)  Mode  Cnt  Score   Error  Units
-ListWriteHeavyBench.eightThreads  UNROLLED  avgt   30  1.823 ± 0.037  us/op
-ListWriteHeavyBench.fourThreads   UNROLLED  avgt   30  0.915 ± 0.018  us/op
-ListWriteHeavyBench.twoThreads    UNROLLED  avgt   30  0.296 ± 0.008  us/op
+ListWriteHeavyBench.eightThreads  UNROLLED  avgt   30  1.938 ± 0.032  us/op
+ListWriteHeavyBench.fourThreads   UNROLLED  avgt   30  1.194 ± 0.022  us/op
+ListWriteHeavyBench.twoThreads    UNROLLED  avgt   30  0.844 ± 0.044  us/op
 * */
 
 @BenchmarkMode(Mode.AverageTime)
@@ -66,7 +66,7 @@ ListWriteHeavyBench.twoThreads    UNROLLED  avgt   30  0.296 ± 0.008  us/op
 public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     private ConcurrentListSet<Integer> set;
 
-    @Param({"UNROLLED", "LF_FR", "LAZY", "LOCK", "LAZY_COARSE"})
+    @Param({"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK"})
     private String type;
 
     @Setup
