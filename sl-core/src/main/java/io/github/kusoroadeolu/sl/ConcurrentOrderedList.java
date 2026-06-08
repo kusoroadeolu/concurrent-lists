@@ -116,12 +116,11 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
                 int res;
                 if ((res = compare(t, curr, l, r)) < 0) return false;
 
-
                 if (res == 0) {
                     if (curr.casMarked()) {
                         helpUnlink(pred, curr);
                         return true;
-                    } else return false; //We return false
+                    } else continue restartFromLeft; //We restart from left
                 }
 
 

@@ -10,16 +10,17 @@ import java.util.stream.IntStream;
 
 import static org.openjdk.jcstress.annotations.Expect.ACCEPTABLE;
 
-public class UnrolledListStress {
+public class EFUnrolledListStress
+{
     @JCStressTest
     @Outcome(id = "1", expect = ACCEPTABLE, desc = "Invariant maintained")
     @State
     public static class OrderedAnchorStress {
-        public  UnrolledConcurrentList<Integer> set;
+        public  EFUnrolledConcurrentList<Integer> set;
         final int bound = 20;
 
         public OrderedAnchorStress() {
-            this.set = new UnrolledConcurrentList<>(4, 1);
+            this.set = new EFUnrolledConcurrentList<>(4, 1);
         }
 
 
@@ -67,10 +68,10 @@ public class UnrolledListStress {
     @Outcome(id = "1", expect = ACCEPTABLE, desc = "Invariant maintained")
     @State
     public static class AnchorInvariantStress {
-        public  UnrolledConcurrentList<Integer> set;
+        public  EFUnrolledConcurrentList<Integer> set;
         final int bound = 20;
         public AnchorInvariantStress() {
-            this.set = new UnrolledConcurrentList<>(4, 1);
+            this.set = new EFUnrolledConcurrentList<>(4, 1);
         }
 
 
@@ -120,4 +121,5 @@ public class UnrolledListStress {
             r.r1 = isLess ? 1 : 0;
         }
     }
+
 }

@@ -53,7 +53,21 @@ ListReadHeavyBench.eightThreads  UNROLLED  avgt   30  1.409 ± 0.022  us/op
 ListReadHeavyBench.fourThreads   UNROLLED  avgt   30  0.931 ± 0.022  us/op
 ListReadHeavyBench.twoThreads    UNROLLED  avgt   30  0.666 ± 0.047  us/op
 * */
-@BenchmarkMode(Mode.AverageTime)
+
+/*
+Benchmark                             (type)   Mode  Cnt  Score   Error   Units
+ListReadHeavyBench.eightThreads  EF_UNROLLED  thrpt   30  9.622 ± 0.422  ops/us
+ListReadHeavyBench.fourThreads   EF_UNROLLED  thrpt   30  9.985 ± 0.325  ops/us
+ListReadHeavyBench.twoThreads    EF_UNROLLED  thrpt   30  9.948 ± 0.309  ops/us
+
+* Benchmark                             (type)  Mode  Cnt  Score   Error  Units
+ListReadHeavyBench.eightThreads  EF_UNROLLED  avgt   30  0.890 ± 0.055  us/op
+ListReadHeavyBench.fourThreads   EF_UNROLLED  avgt   30  0.427 ± 0.048  us/op
+ListReadHeavyBench.twoThreads    EF_UNROLLED  avgt   30  0.201 ± 0.003  us/op
+* */
+
+
+@BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 @Warmup(iterations = 10, time = 1)
@@ -62,7 +76,7 @@ ListReadHeavyBench.twoThreads    UNROLLED  avgt   30  0.666 ± 0.047  us/op
 public class ListReadHeavyBench {
     private ConcurrentListSet<Integer> set;
 
-    @Param({"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK"})
+    @Param({"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED"})
     private String type;
 
     @Setup
@@ -73,6 +87,8 @@ public class ListReadHeavyBench {
             case "LAZY" -> new LazySyncList<>();
             case "LAZY_COARSE" -> new LazyCoarseSyncList<>();
             case "LOCK" -> new LockedOrderedLL<>();
+            case "EF_UNROLLED" -> new EFUnrolledConcurrentList<>();
+
             default -> throw new IllegalArgumentException();
         };
 

@@ -59,7 +59,12 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
     public UnrolledConcurrentList(int arrCap, int minFull) {
         this.left = new SentinelNode<>();
         this.right = new SentinelNode<>();
-        left.next = right;
+        left.lock();
+        try {
+            left.next = right;
+        }finally {
+            left.unlock();
+        }
 
         localArrays = ThreadLocal.withInitial(LocalArrays::new);
         this.minFull = minFull;
@@ -70,13 +75,14 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
     public boolean add(T t) {
         Objects.requireNonNull(t);
+        Node<T> l = left;
         Node<T> r = right;
         int aCap = arrayCap;
         var localArrays = this.localArrays.get();
         var nodes = localArrays.nodes();
         var indices = localArrays.indices(); //Stores exists in array index and size respectively
         while (true) {
-            if (isPresent(t, nodes)) return false;
+            if (isPresent(t, l, r ,nodes, aCap)) return false;
             var pred = nodes[0];
             var curr = nodes[1];
 
@@ -85,9 +91,6 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
            pred.lock();
             try {
                 if (isNotValid(pred, curr)) continue;
-                fillValueIndexAndSize(t, curr, indices, Operation.ADD);
-                int index = indices[0];
-                if (index != -1) return false;
 
                 if (curr == r || t.compareTo(curr.anchor) < 0) {
                     Node<T> n = new Node<>(t, aCap);
@@ -97,8 +100,14 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                     return true;
                 }
 
+
+                fillValueIndexAndSize(t, curr, indices, Operation.ADD);
+                int index = indices[0];
+                if (index != -1) return false;
+
+
                 int size = indices[1];
-                int idx = findAvailableIndex(curr);
+                int idx = findAvailableIndex(aCap, curr);
 
                 if (size < aCap) {
                     curr.soArray(idx, t); //Linearization point
@@ -137,13 +146,14 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
     public boolean remove(Object o) {
         T t = (T) Objects.requireNonNull(o);
+        Node<T> l = left;
         Node<T> r = right;
         int aCap = arrayCap;
         var localArrays = this.localArrays.get();
         var nodes = localArrays.nodes();
         var indices = localArrays.indices();
         while (true) {
-            if (!isPresent(t, nodes)) return false;
+            if (!isPresent(t, l, r ,nodes, aCap)) return false;
             var pred = nodes[0];
             var curr = nodes[1];
 
@@ -177,12 +187,12 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                         int succSize = succ.size(aCap);
                         int total = currSize + succSize;
                         int[] emptyIndexes = new int[succSize];
-                        findEmptyIndexes(emptyIndexes, curr);
+                        findEmptyIndexes(emptyIndexes, aCap ,curr);
                         //                Node map: {4=[4, 10, 2], 16=[19]}
                         if (total <= maxMerge) { // Merge to fill the lower indices
-                            merge(curr, succ, emptyIndexes);
+                            merge(curr, succ, arrayCap ,emptyIndexes);
                         } else { //Redistribute so the lower index is not sparse
-                            redistribute(curr, succ, succSize ,total);
+                            redistribute(curr, succ, succSize, aCap ,total);
                         }
 
                         return true;
@@ -207,13 +217,14 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         var localArrays = this.localArrays.get();
         var nodes = localArrays.nodes();
         Node<T> curr;
+        Node<T> l = left, r = right;
 
         do {
-            findNode(t, nodes);
+            findNode(t, l, r ,nodes);
             curr = nodes[1];
         } while (curr.loMarked());
 
-        if (curr == right  || curr.anchor.compareTo(t) > 0) return false;
+        if (curr == r || curr.anchor.compareTo(t) > 0) return false;
 
         for (int i = arrayCap - 1; i >= 0; --i) {
             T v = curr.loArray(i);
@@ -225,7 +236,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
 
 
-    void findEmptyIndexes(int[] indexes, Node<T> node) {
+    static <T extends Comparable<T>> void findEmptyIndexes(int[] indexes, int arrayCap ,Node<T> node) {
         int size = indexes.length;
         for (int i = 0, j = 0; i < arrayCap; ++i) {
             T t = node.lpArray(i);
@@ -236,7 +247,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         }
     }
 
-    int findAvailableIndex(Node<T> node) {
+    int findAvailableIndex(int arrayCap,  Node<T> node) {
         for (int i = 0; i < arrayCap; ++i) {
             if (node.lpArray(i) == null) {
                 return i;
@@ -272,7 +283,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         return -1;
     }
 
-    void merge(Node<T> curr, Node<T> succ, int[] indexes) {
+    static <T extends Comparable<T>>void merge(Node<T> curr, Node<T> succ, int arrayCap ,int[] indexes) {
         for (int i = 0, j = 0; i < arrayCap; ++i) {
             T t = succ.lpArray(i);
             if (t != null) {
@@ -287,7 +298,8 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
     }
 
-    void redistribute(Node<T> curr, Node<T> succ, int succSize ,int total) {
+
+    static <T extends Comparable<T>>void redistribute(Node<T> curr, Node<T> succ, int succSize, int arrayCap ,int total) {
         Object[] copy = Arrays.stream(succ.array.clone())
                 .filter(Objects::nonNull)
                 .toArray();
@@ -306,6 +318,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         }
 
         succ.soMarked();
+
         node.spNext(succ.lpNext());
         curr.soNext(node);
 
@@ -367,12 +380,12 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         }
     }
 
-    boolean isNotValid(Node<T> pred, Node<T> curr) {
+    static <T extends Comparable<T>>boolean isNotValid(Node<T> pred, Node<T> curr) {
         return pred.lpMarked() || curr.lpMarked() || pred.lpNext() != curr;
     }
 
-    boolean isPresent(T t, Node<T>[] nodes){
-        findNode(t, nodes);
+    static <T extends Comparable<T>>boolean isPresent(T t, Node<T> left, Node<T> right ,Node<T>[] nodes, int arrayCap){
+        findNode(t, left, right ,nodes);
         var curr = nodes[1];
 
         if (curr == right || curr.loMarked() || curr.anchor.compareTo(t) > 0) return false;
@@ -393,7 +406,6 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         indices[0] = -1;
         indices[1] = 0;
 
-        if (curr == right) return;
         for (int i = 0; i < arrayCap; ++i) {
             T v = curr.lpArray(i);
             if (v != null && t.compareTo(v) == 0) {
@@ -409,7 +421,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
 
 
-    void findNode(T t, Node<T>[] nodes) {
+   static <T extends Comparable<T>>void findNode(T t, Node<T> left, Node<T> right ,Node<T>[] nodes) {
         Node<T> l = left, r = right;
         Node<T> pred = l;
         Node<T> curr = l.loNext();
@@ -451,6 +463,10 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
         void lock() {
             lock.lock();
+        }
+
+        boolean tryLock() {
+           return lock.tryLock();
         }
 
         void unlock() {
@@ -571,18 +587,13 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
     static class LocalArrays<T extends Comparable<T>> {
         //Used for storing pred and curr arrays;
-        final Node<T>[] nodes;
+        final Node<T>[] nodes; //0 - pred, 1 - curr
         //Used for storing indices to prevent extra traversals to calculate size;
-        final int[] indices;
+        final int[] indices; // 0 - index, 1 - size
 
         public LocalArrays() {
             this.nodes = new Node[2];
             this.indices = new int[2];
-        }
-
-        public LocalArrays(Node[] nodes, int[] indices) {
-            this.nodes = nodes;
-            this.indices = indices;
         }
 
         public Node<T>[] nodes() {

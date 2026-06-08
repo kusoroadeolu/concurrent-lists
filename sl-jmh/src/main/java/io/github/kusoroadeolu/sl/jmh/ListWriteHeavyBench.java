@@ -45,6 +45,7 @@ ListWriteHeavyBench.twoThreads           LOCK  avgt   30   68.582 ±  1.676  us/
 ListWriteHeavyBench.twoThreads    LAZY_COARSE  avgt   30   36.923 ±  1.415  us/op
 * */
 
+//UNROLLED Variants
 /* ArraySize Per Node = 64
 Benchmark                           (type)   Mode  Cnt  Score   Error   Units
 ListWriteHeavyBench.eightThreads  UNROLLED  thrpt   30  3.871 ± 0.056  ops/us
@@ -57,6 +58,19 @@ ListWriteHeavyBench.fourThreads   UNROLLED  avgt   30  1.194 ± 0.022  us/op
 ListWriteHeavyBench.twoThreads    UNROLLED  avgt   30  0.844 ± 0.044  us/op
 * */
 
+/*
+* Benchmark                              (type)   Mode  Cnt  Score   Error   Units
+ListWriteHeavyBench.eightThreads  EF_UNROLLED  thrpt   30  6.812 ± 0.404  ops/us
+ListWriteHeavyBench.fourThreads   EF_UNROLLED  thrpt   30  6.891 ± 0.257  ops/us
+ListWriteHeavyBench.twoThreads    EF_UNROLLED  thrpt   30  6.994 ± 0.121  ops/us
+*
+*
+Benchmark                              (type)  Mode  Cnt  Score   Error  Units
+ListWriteHeavyBench.eightThreads  EF_UNROLLED  avgt   30  1.254 ± 0.088  us/op
+ListWriteHeavyBench.fourThreads   EF_UNROLLED  avgt   30  0.597 ± 0.022  us/op
+ListWriteHeavyBench.twoThreads    EF_UNROLLED  avgt   30  0.279 ± 0.008  us/op
+* */
+
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
@@ -66,7 +80,7 @@ ListWriteHeavyBench.twoThreads    UNROLLED  avgt   30  0.844 ± 0.044  us/op
 public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     private ConcurrentListSet<Integer> set;
 
-    @Param({"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK"})
+    @Param({"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED"})
     private String type;
 
     @Setup
@@ -77,6 +91,7 @@ public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
             case "LAZY" -> new LazySyncList<>();
             case "LAZY_COARSE" -> new LazyCoarseSyncList<>();
             case "LOCK" -> new LockedOrderedLL<>();
+            case "EF_UNROLLED" -> new EFUnrolledConcurrentList<>();
             default -> throw new IllegalArgumentException();
         };
 
@@ -116,7 +131,6 @@ public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     private void doWork(Blackhole bh) {
         int key = ThreadLocalRandom.current().nextInt(10_000);
         int op = ThreadLocalRandom.current().nextInt(100);
-
         if (op < 50) {
             bh.consume(set.add(key));
         } else if (op < 90) {

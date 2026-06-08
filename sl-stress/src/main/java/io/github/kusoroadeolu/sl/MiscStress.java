@@ -36,4 +36,25 @@ public class MiscStress {
             }
         }
     }
+
+    @JCStressTest(Mode.Termination)
+    @Outcome(id = "TERMINATED", expect = ACCEPTABLE,             desc = "Gracefully finished")
+    @Outcome(id = "STALE",      expect = ACCEPTABLE_INTERESTING, desc = "Test is stuck")
+    @State
+    public static class DoubleHappensBefore {
+        boolean ready = false;
+        private AtomicIntegerArray array = new AtomicIntegerArray(2);
+
+        @Actor
+        public void actor() {
+            while (array.getAcquire(1) == 0 && !ready);
+        }
+
+        @Signal
+        public void signaller() {
+            ready = true;
+            array.setRelease(0, 1);
+            array.setRelease(1, 1);
+        }
+    }
 }

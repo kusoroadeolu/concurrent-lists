@@ -92,11 +92,11 @@ class LazyOptimisticListTest {
     @Test
     void concurrentRemoves() {
         Lincheck.runConcurrentTest(() -> {
-            var list = new LazySyncList<Integer>();
+            var list = new EFUnrolledConcurrentList<Integer>();
 
             Thread t1 = new Thread(() -> {
                 list.add(1);
-                list.add(3);
+                list.add(2);
                 list.remove(5);
             });
             Thread t2 = new Thread(() -> {
@@ -112,7 +112,7 @@ class LazyOptimisticListTest {
 
             try {
                 t1.join(); t2.join(); t3.join();
-                var ls = list.toList();
+                var ls = list.anchorList();
 
                 boolean isSorted = IntStream.range(0, ls.size() - 1)
                         .allMatch(i -> ls.get(i) <= ls.get(i + 1));
