@@ -59,19 +59,14 @@ ListWriteHeavyBench.twoThreads    UNROLLED  avgt   30  0.844 ± 0.044  us/op
 * */
 
 /*
-* Benchmark                              (type)   Mode  Cnt  Score   Error   Units
-ListWriteHeavyBench.eightThreads  EF_UNROLLED  thrpt   30  6.812 ± 0.404  ops/us
-ListWriteHeavyBench.fourThreads   EF_UNROLLED  thrpt   30  6.891 ± 0.257  ops/us
-ListWriteHeavyBench.twoThreads    EF_UNROLLED  thrpt   30  6.994 ± 0.121  ops/us
+Benchmark                              (type)   Mode  Cnt  Score   Error   Units
+ListWriteHeavyBench.eightThreads  EF_UNROLLED  thrpt   30  0.041 ± 0.006  ops/us
+ListWriteHeavyBench.fourThreads   EF_UNROLLED  thrpt   30  0.038 ± 0.005  ops/us
+ListWriteHeavyBench.twoThreads    EF_UNROLLED  thrpt   30  0.032 ± 0.003  ops/us
 *
-*
-Benchmark                              (type)  Mode  Cnt  Score   Error  Units
-ListWriteHeavyBench.eightThreads  EF_UNROLLED  avgt   30  1.254 ± 0.088  us/op
-ListWriteHeavyBench.fourThreads   EF_UNROLLED  avgt   30  0.597 ± 0.022  us/op
-ListWriteHeavyBench.twoThreads    EF_UNROLLED  avgt   30  0.279 ± 0.008  us/op
 * */
 
-@BenchmarkMode(Mode.AverageTime)
+@BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 @Warmup(iterations = 10, time = 1)

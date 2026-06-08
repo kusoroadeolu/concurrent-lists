@@ -40,7 +40,6 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
 
         if ((tn.node != null && curr != tn.node) || pred.loMarked() || curr.loMarked()) {
             tn.markAllRetry();
-            return false;
         }
 
         if (pred.tryLock()) {
@@ -59,7 +58,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
                     return true;
                 }
 
-                List<ThreadNode<T>> validNodes = findValidNodes(tn, curr ,localValues);
+                List<ThreadNode<T>> validNodes = filterValidNodes(tn, curr ,localValues);
                 int tnSize = validNodes.size();
                 int size = curr.size(aCap);
                 int newSize = size + tnSize;
@@ -68,7 +67,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
                     for (int i = 0, idx = 0; idx < tnSize; ++i) {
                         if (curr.lpArray(i) == null) {
                             var v = validNodes.get(idx++);
-                            curr.soArray(idx, v.value);
+                            curr.soArray(i, v.value);
                             v.soFinished();
                         }
 
@@ -151,7 +150,6 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
 
         if ((tn.node != null && curr != tn.node) || pred.loMarked() || curr.loMarked()) {
             tn.markAllRetry();
-            return false;
         }
 
         if (curr == r || curr.anchor.compareTo(tn.value) > 0) {
@@ -256,13 +254,12 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
         return false;
     }
 
-    List<ThreadNode<T>> findValidNodes(ThreadNode<T> tn, Node<T> curr,EFUnrolledConcurrentList.LocalValues<T> localValues) {
+    List<ThreadNode<T>> filterValidNodes(ThreadNode<T> tn, Node<T> curr, EFUnrolledConcurrentList.LocalValues<T> localValues) {
         List<ThreadNode<T>> ls = new ArrayList<>();
         var h = tn;
         while (h != null) {
-            if (curr != currNode(h, localValues) || h.value.compareTo(curr.anchor) < 0) {
-                h.soRetry();
-            } else ls.add(h);
+            if (h.value.compareTo(curr.anchor) < 0 || currNode(h, localValues) != curr) h.soRetry();
+            else ls.add(h);
 
             h = h.next;
         }
@@ -274,13 +271,13 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
         var h = tn;
         int removed = 0;
         while (h != null) {
-            var v = h.value;
-            if (curr != currNode(h, lv)) { //Ensure curr node for h.value == curr, this can get expensive later on, we'll probably need a more efficient traversal mechanic at some point
+            if (h.value.compareTo(curr.anchor) < 0 || currNode(h, lv) != curr) {
                 h.soRetry();
                 h = h.next;
                 continue;
             }
 
+            var v = h.value;
             boolean found = false;
             for (int i = 0; i < arrayCap; ++i) {
                 var value = curr.lpArray(i);

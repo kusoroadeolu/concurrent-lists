@@ -138,9 +138,9 @@ public class EFUnrolledConcurrentList<T extends Comparable<T>>  implements Concu
                 if (status == NOT_FOUND || status == FINISHED) return;
             }
 
-            ourNode.node = s.currNode(ourNode, localValues); //Find first, before we add or remove, reduces the possibility of failure
             boolean succeed = op == Operation.ADD ? s.add(ourNode, localValues) : s.remove(ourNode, localValues);
             if (succeed) return;
+            ourNode.node = s.currNode(ourNode, localValues); //Find first, before we add or remove, reduces the possibility of failure
             l.setRelease(idx, ourNode); //Re write our info
         }
     }

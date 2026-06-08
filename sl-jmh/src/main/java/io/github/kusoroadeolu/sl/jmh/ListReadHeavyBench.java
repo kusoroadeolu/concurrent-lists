@@ -54,17 +54,7 @@ ListReadHeavyBench.fourThreads   UNROLLED  avgt   30  0.931 ± 0.022  us/op
 ListReadHeavyBench.twoThreads    UNROLLED  avgt   30  0.666 ± 0.047  us/op
 * */
 
-/*
-Benchmark                             (type)   Mode  Cnt  Score   Error   Units
-ListReadHeavyBench.eightThreads  EF_UNROLLED  thrpt   30  9.622 ± 0.422  ops/us
-ListReadHeavyBench.fourThreads   EF_UNROLLED  thrpt   30  9.985 ± 0.325  ops/us
-ListReadHeavyBench.twoThreads    EF_UNROLLED  thrpt   30  9.948 ± 0.309  ops/us
 
-* Benchmark                             (type)  Mode  Cnt  Score   Error  Units
-ListReadHeavyBench.eightThreads  EF_UNROLLED  avgt   30  0.890 ± 0.055  us/op
-ListReadHeavyBench.fourThreads   EF_UNROLLED  avgt   30  0.427 ± 0.048  us/op
-ListReadHeavyBench.twoThreads    EF_UNROLLED  avgt   30  0.201 ± 0.003  us/op
-* */
 
 
 @BenchmarkMode(Mode.Throughput)
