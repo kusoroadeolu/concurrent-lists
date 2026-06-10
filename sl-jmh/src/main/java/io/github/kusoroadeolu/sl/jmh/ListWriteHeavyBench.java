@@ -90,7 +90,7 @@ public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     public void setup() {
         set = switch (type) {
             case "LF_FR" -> new ConcurrentOrderedList<>();
-            case "ELIM_UNROLLED" -> new EliminationUnrolledLinkedList<>(128, 32);
+            case "ELIM_UNROLLED" -> new EliminationUnrolledLinkedList<>();
             case "LAZY" -> new LazySyncList<>();
             case "LAZY_COARSE" -> new LazyCoarseSyncList<>();
             case "LOCK" -> new LockedOrderedLL<>();

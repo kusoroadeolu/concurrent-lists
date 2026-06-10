@@ -51,8 +51,8 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
     private final ThreadLocal<LocalArrays<T>> localArrays;
 
     private static final Object FREE = null;
-    private static final int MAX_SPINS = 2000;
-    private static final int SLOT_SPINS = 2000 / NCPU;
+    private static final int MAX_SPINS = 1000;
+    private static final int SLOT_SPINS = MAX_SPINS / NCPU;
     private static final int ARENA_LEN = NCPU / 2;
     private static final int ARENA_MASK = ARENA_LEN - 1;
 
