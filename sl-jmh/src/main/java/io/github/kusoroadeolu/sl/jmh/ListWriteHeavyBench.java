@@ -66,6 +66,14 @@ ListWriteHeavyBench.twoThreads    EF_UNROLLED  thrpt   30  0.032 ± 0.003  ops/u
 *
 * */
 
+/*
+*
+Benchmark                                (type)   Mode  Cnt  Score   Error   Units
+ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  thrpt   30  2.694 ± 0.210  ops/us
+ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  thrpt   30  2.136 ± 0.103  ops/us
+ListWriteHeavyBench.twoThreads    ELIM_UNROLLED  thrpt   30  1.546 ± 0.082  ops/us
+* */
+
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
@@ -75,17 +83,18 @@ ListWriteHeavyBench.twoThreads    EF_UNROLLED  thrpt   30  0.032 ± 0.003  ops/u
 public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     private ConcurrentListSet<Integer> set;
 
-    @Param({"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED"})
+    @Param({"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED", "ELIM_UNROLLED"})
     private String type;
 
     @Setup
     public void setup() {
         set = switch (type) {
             case "LF_FR" -> new ConcurrentOrderedList<>();
-            case "UNROLLED" -> new UnrolledConcurrentList<>();
+            case "ELIM_UNROLLED" -> new EliminationUnrolledLinkedList<>(128, 32);
             case "LAZY" -> new LazySyncList<>();
             case "LAZY_COARSE" -> new LazyCoarseSyncList<>();
             case "LOCK" -> new LockedOrderedLL<>();
+            case "UNROLLED" -> new UnrolledConcurrentList<>();
             case "EF_UNROLLED" -> new EFUnrolledConcurrentList<>();
             default -> throw new IllegalArgumentException();
         };

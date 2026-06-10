@@ -13,17 +13,17 @@ import static io.github.kusoroadeolu.sl.EFUnrolledConcurrentList.Status.*;
 
 
 /*
-* An unrolled concurrent linked list that combines elimination and flat combining.
-* Ideally elimination works horribly with linked lists, as removes and adds need to combine with very specific threads.
-* However rather than going the ideal elimination route and eliminating against opposite ops,
-* we use the elimination arena as a means to collide threads who have similar operations as us on a given node (as this is an unrolled list)
-* We then apply those threads' operations for them when we acquire the lock of that node, or if the node or its predecessor has been deleted, we force all threads to retry
-* Duplicates are allowed in this list to reduce complexity
-*
-*
-* This is pretty much experimental, and the results are really not that great due to all the
-* overhead of retrying if a node is deleted and the overhead of verifying i
-*  */
+ * An unrolled concurrent linked list that combines elimination and flat combining.
+ * Ideally elimination works horribly with linked lists, as removes and adds need to combine with very specific threads.
+ * However rather than going the ideal elimination route and eliminating against opposite ops,
+ * we use the elimination arena as a means to collide threads who have similar operations as us on a given node (as this is an unrolled list)
+ * We then apply those threads' operations for them when we acquire the lock of that node, or if the node or its predecessor has been deleted, we force all threads to retry
+ * Duplicates are allowed in this list to reduce complexity
+ *
+ *
+ * This is pretty much experimental, and the results are really not that great due to all the
+ * overhead of retrying if a node is deleted and the overhead of verifying i
+ *  */
 public class EFUnrolledConcurrentList<T extends Comparable<T>>  implements ConcurrentListSet<T>{
 
     private final AtomicIntegerArray arena;
@@ -85,12 +85,12 @@ public class EFUnrolledConcurrentList<T extends Comparable<T>>  implements Concu
     }
 
     static AtomicIntegerArray newCollisionArray() {
-       var arr = new AtomicIntegerArray(NCPU);
-       for (int i = 0; i < NCPU; ++i) {
-           arr.setRelease(i, EMPTY);
-       }
+        var arr = new AtomicIntegerArray(NCPU);
+        for (int i = 0; i < NCPU; ++i) {
+            arr.setRelease(i, EMPTY);
+        }
 
-       return arr;
+        return arr;
     }
 
     void doFind(ThreadNode<T> ourNode, LocalValues<T> localValues) {
@@ -120,8 +120,8 @@ public class EFUnrolledConcurrentList<T extends Comparable<T>>  implements Concu
 
                     } else {
                         //If we can't make ourselves unavailable, another thread has collided with us, so we wait
-                         var status = tryFinishCollide(ourNode);
-                         if (status == NOT_FOUND || status == FINISHED) return;
+                        var status = tryFinishCollide(ourNode);
+                        if (status == NOT_FOUND || status == FINISHED) return;
                     }
 
                     ourNode.node = s.currNode(ourNode, localValues); //find a new curr node, backed by set release from idx
@@ -201,7 +201,7 @@ public class EFUnrolledConcurrentList<T extends Comparable<T>>  implements Concu
     }
 
     public List<T> anchorList() {
-       return list.anchorList();
+        return list.anchorList();
     }
 
     public Map<T, List<T>> nodeMap() {

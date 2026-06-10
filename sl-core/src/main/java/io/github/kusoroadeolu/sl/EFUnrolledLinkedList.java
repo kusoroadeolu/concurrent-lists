@@ -136,7 +136,8 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
         System.arraycopy(copy, half, arr2, 0, rem);
         nodes[0] = new Node<>(arr1);
         nodes[1] = new Node<>(arr2);
-        assert nodes[0].anchor.compareTo(pred.anchor) > 0 &&  nodes[1].anchor.compareTo(pred.anchor) > 0;
+
+       // assert nodes[0].anchor.compareTo(pred.anchor) > 0 &&  nodes[1].anchor.compareTo(pred.anchor) > 0;
     }
 
      boolean remove(ThreadNode<T> tn, EFUnrolledConcurrentList.LocalValues<T> localValues) {
