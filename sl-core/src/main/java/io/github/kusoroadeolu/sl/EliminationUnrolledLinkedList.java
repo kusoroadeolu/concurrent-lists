@@ -6,10 +6,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
-import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.Operation;
-import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.findNonNullIndex;
+import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.*;
 
 /*
 An elimination based unrolled linked list.
@@ -39,7 +39,7 @@ nullifying the effects of per node concurrency. Another potential benchmark note
 with values with close key spaces, so threads collide more often in nodes near to each other
 
 Obviously more improvements can be made to this
-For example the start index calculation rather than using thread id.
+For example the start index calculation rather than using thread id. This structure doesnt not maintain the set invariant
 */
 public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements ConcurrentListSet<T>{
     private static final int NCPU = Runtime.getRuntime().availableProcessors();
@@ -51,7 +51,7 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
     private final ThreadLocal<LocalArrays<T>> localArrays;
 
     private static final Object FREE = null;
-    private static final int MAX_SPINS = 1000;
+    private static final int MAX_SPINS = 500;
     private static final int SLOT_SPINS = MAX_SPINS / NCPU;
     private static final int ARENA_LEN = NCPU / 2;
     private static final int ARENA_MASK = ARENA_LEN - 1;
@@ -84,9 +84,10 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
         var localArrays = this.localArrays.get();
         var nodes = localArrays.nodes();
         var indices = localArrays.indices(); //Stores exists in array index and size respectively
+        var metrics = localArrays.metrics();
         ThreadInfo<T> info = null;
         while (true) {
-            if (isPresent(t, l, r ,nodes, aCap)) return false;
+            findNode(t, l, r, nodes);
             var pred = nodes[0];
             var curr = nodes[1];
 
@@ -144,6 +145,7 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
 
                 }finally {
                     pred.unlock();
+                    metrics.incNodeSuccesses();
                     nodes[0] = null;
                     nodes[1] = null;
                 }
@@ -151,7 +153,11 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
                 if (info == null)
                     info = new ThreadInfo<>(t, Operation.ADD);
                 var arena = curr.arena;
-                if (scanAndMatch(info, arena) || awaitExchange(info, arena)) return true;
+                int start = ThreadLocalRandom.current().nextInt();
+                if (scanAndMatch(info, arena, start) || awaitExchange(info, arena, start)) {
+                    metrics.incArenaSuccesses();
+                    return true;
+                }
             }
         }
     }
@@ -164,9 +170,19 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
         var localArrays = this.localArrays.get();
         var nodes = localArrays.nodes();
         var indices = localArrays.indices();
+        var metrics = localArrays.metrics();
         ThreadInfo<T> info = null;
         while (true) {
-            if (!isPresent(t, l, r ,nodes, aCap)) return false;
+            //Doesnt violate the set invariant, for adds it will though
+            if (!isPresent(t, l, r ,nodes, aCap)) {
+                var curr = nodes[1];
+                if (curr == r) return false;
+                //Try to scan and match
+                if (info == null) info = new ThreadInfo<>(t, Operation.REMOVE);
+                boolean succeed = scanAndMatch(info, nodes[1].arena, ThreadLocalRandom.current().nextInt());
+                if (succeed) metrics.incArenaSuccesses();
+                return succeed;
+            }
             var pred = nodes[0];
             EliminationNode<T> curr =  nodes[1];
             if (pred.loMarked() || curr.loMarked()) continue;
@@ -177,7 +193,14 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
                     fillValueIndexAndSize(t, curr, aCap ,indices, UnrolledConcurrentList.Operation.REMOVE);
                     int index = indices[0];
                     int size = indices[1];
-                    if (index  == -1) return false;
+                    if (index  == -1) {
+                        if (curr == r) return false;
+                        //Try to scan and match incase an add thread came while we held the lock
+                        if (info == null) info = new ThreadInfo<>(t, Operation.REMOVE);
+                        boolean succeed = scanAndMatch(info, curr.arena, ThreadLocalRandom.current().nextInt());
+                        if (succeed) metrics.incArenaSuccesses();
+                        return succeed;
+                    }
                     nullifyIndex(index, aCap ,curr);
                     int currSize = size - 1;
 
@@ -202,7 +225,7 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
                             findEmptyIndexes(emptyIndexes, aCap ,curr);
                             //                Node map: {4=[4, 10, 2], 16=[19]}
                             if (total <= maxMerge) { // Merge to fill the lower indices
-                                merge(curr, succ, arrayCap ,emptyIndexes);
+                                merge(curr, succ, aCap ,emptyIndexes);
                             } else { //Redistribute so the lower index is not sparse
                                 redistribute(curr, succ, succSize, aCap ,total);
                             }
@@ -219,21 +242,25 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
 
                 }finally {
                     pred.unlock();
+                    metrics.incNodeSuccesses();
                     nodes[0] = null;
                     nodes[1] = null;
                 }
             } else {
                 if (info == null)
                     info = new ThreadInfo<>(t, Operation.REMOVE);
+                int start = ThreadLocalRandom.current().nextInt();
                 var arena = curr.arena;
-                if (scanAndMatch(info, arena) || awaitExchange(info, arena)) return true;
+                if (scanAndMatch(info, arena, start) || awaitExchange(info, arena, start)) {
+                    metrics.incArenaSuccesses();
+                    return true;
+                }
             }
         }
     }
 
     //We intentionally don't start at zero to allow threads to spread out across the array and prevent contention at that index
-    boolean scanAndMatch(ThreadInfo<T> ours, AtomicReferenceArray<ThreadInfo<T>> arena){
-        int start = (int) Thread.currentThread().threadId();
+    boolean scanAndMatch(ThreadInfo<T> ours, AtomicReferenceArray<ThreadInfo<T>> arena, int start){
         for (int i = 0; i < ARENA_LEN; ++i) {
             int slot = (start + i) & ARENA_MASK;
             ThreadInfo<T> theirs = arena.getAcquire(slot);
@@ -247,9 +274,8 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
         return false;
     }
 
-    boolean awaitExchange(ThreadInfo<T> ours, AtomicReferenceArray<ThreadInfo<T>> arena) {
-        int start = (int) Thread.currentThread().threadId();
-        outer: for (int i = 0, totalSpins = 0; totalSpins < MAX_SPINS && i < ARENA_LEN; ++i){
+    boolean awaitExchange(ThreadInfo<T> ours, AtomicReferenceArray<ThreadInfo<T>> arena, int start) {
+        for (int i = 0, totalSpins = 0; totalSpins < MAX_SPINS && i < ARENA_LEN; ++i){
             int slot = (start + i) & ARENA_MASK;
             ThreadInfo<T> theirs = arena.getAcquire(slot);
             if (theirs == free()) {
@@ -265,7 +291,9 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
                             }
                             else return true; //Someone else has eliminated us
                         }
-                        ++slotSpins;
+
+                        slotSpins++;
+                        Thread.onSpinWait();
                     }
                 }
             } else if (theirs.op() != ours.op() && theirs.value() == ours.value()
@@ -277,7 +305,6 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
 
         return false; //Failed to match
     }
-
 
     /*======================= COPIED METHODS FROM THE ORIGINAL ADAPTED TO USE ELIMINATION NODE ==============================*/
 
@@ -479,14 +506,20 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
         final EliminationNode<T>[] nodes; //0 - pred, 1 - curr
         //Used for storing indices to prevent extra traversals to calculate size;
         final int[] indices; // 0 - index, 1 - size
+        final EliminationMetrics metrics;
 
         public LocalArrays() {
             this.nodes = new EliminationNode[2];
             this.indices = new int[2];
+            this.metrics = new EliminationMetrics();
         }
 
         public EliminationNode<T>[] nodes() {
             return nodes;
+        }
+
+        public EliminationMetrics metrics() {
+            return metrics;
         }
 
         public int[] indices() {
@@ -497,5 +530,10 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
 
     public static <T extends Comparable<T>> ThreadInfo<T> free() {
         return  (ThreadInfo<T>) FREE;
+    }
+
+
+    public EliminationMetrics metrics() {
+        return localArrays.get().metrics();
     }
 }
