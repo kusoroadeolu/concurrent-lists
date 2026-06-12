@@ -141,7 +141,6 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
         Node<T> next;
         Node<T> dummy;
 
-
         //If we find any marked node that's not a dummy while traversing, we need to ensure it already has it's dummy tombstone, otherwise we can have lost writs
         while (curr.isMarked()) {
             if (!curr.isDummy()) {
@@ -152,6 +151,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
                     dummy.spNext(next); //Backed by cas
                 } while (!curr.casNext(next, dummy));
             }
+
            curr = curr.loNext(); //We might not have been the ones to cas dummy to so we still need to use curr to move ahead
         }
 

@@ -36,7 +36,7 @@ UnrolledListContentionBenchmark.fullWrite:nodeSuccesses              256  ELIM_U
 
 /*
 * so i did some profiling(for the suspicious results) and its pretty surprising.
-* My guess that  maybe it was benchmarking issue or JIT not warming up fully, but after looking at the profile data, i realized that the contention was situated solely in the add method(especially in the elimination arena).
+* My guess that  maybe it was benchmarking issue or JIT not warming up fully, but after looking at the profile data, I realized that the contention was situated solely in the add method(especially in the elimination arena).
 * Now while this doesnt mean much, I dug deeper and the main path that was flagged by the profiler was the inner spin loop while a thread is waiting to be eliminated.
 * That only meant one thing, threads were waiting the full sprint in the elimination arena, which also meant two things either
 * 1. Removes were never reaching the elim arena or

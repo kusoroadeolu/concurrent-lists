@@ -2,8 +2,8 @@ package io.github.kusoroadeolu.sl;
 
 import org.openjdk.jcstress.annotations.*;
 import org.openjdk.jcstress.infra.results.II_Result;
-import org.openjdk.jcstress.infra.results.I_Result;
 
+import java.lang.invoke.VarHandle;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.locks.Lock;
@@ -57,4 +57,76 @@ public class MiscStress {
             array.setRelease(1, 1);
         }
     }
+
+    @JCStressTest()
+    @Outcome(id = {"1, 1", "1, 0", "0, 0"}, expect = ACCEPTABLE, desc = "Acceptable")
+    @State
+    public static class RAFenceStress {
+        int a = 0;
+        int b = 0;
+
+
+        @Actor
+        public void writer() {
+            VarHandle.releaseFence();
+            a = 1;
+            VarHandle.releaseFence();
+            b = 1;
+        }
+
+
+        //Invalid a = 0, b = 1;
+        @Actor
+        public void reader(II_Result r) {
+            VarHandle.acquireFence();
+            r.r1 = a;
+            r.r2 = b;
+        }
+    }
+
+    @JCStressTest(Mode.Termination)
+    @Outcome(id = "TERMINATED", expect = ACCEPTABLE,             desc = "Gracefully finished")
+    @Outcome(id = "STALE",      expect = ACCEPTABLE_INTERESTING, desc = "Test is stuck")
+    @State
+    public static class RAFenceVisibilityStress {
+        boolean ready = false;
+
+        @Actor
+        public void actor() {
+            do {
+                VarHandle.acquireFence();
+            }while (!ready);
+        }
+
+        @Signal
+        public void signaller() {
+            ready = true;
+            VarHandle.releaseFence();
+        }
+    }
+    @JCStressTest(Mode.Termination)
+    @Outcome(id = "TERMINATED", expect = ACCEPTABLE,             desc = "Gracefully finished")
+    @Outcome(id = "STALE",      expect = ACCEPTABLE_INTERESTING, desc = "Test is stuck")
+    @State
+    public static class RAFenceMultiVisibilityStress {
+        boolean ready = false;
+        boolean done = false;
+
+        @Actor
+        public void actor() {
+            do {
+                VarHandle.acquireFence();
+            }while (!ready && !done);
+        }
+
+        @Signal
+        public void signaller() {
+            ready = true;
+            VarHandle.releaseFence();
+            done = true;
+            VarHandle.releaseFence();
+            VarHandle.storeStoreFence();
+        }
+    }
+
 }
