@@ -4,7 +4,6 @@ import org.openjdk.jcstress.annotations.*;
 import org.openjdk.jcstress.infra.results.II_Result;
 
 import java.lang.invoke.VarHandle;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -125,7 +124,6 @@ public class MiscStress {
             VarHandle.releaseFence();
             done = true;
             VarHandle.releaseFence();
-            VarHandle.storeStoreFence();
         }
     }
 

@@ -67,14 +67,18 @@ ListWriteHeavyBench.twoThreads    EF_UNROLLED  thrpt   30  0.032 ± 0.003  ops/u
 * */
 
 /*
+* Benchmark                                (type)   Mode  Cnt  Score   Error   Units
+ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  thrpt   30  3.276 ± 0.177  ops/us
+ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  thrpt   30  2.983 ± 0.047  ops/us
+ListWriteHeavyBench.twoThreads    ELIM_UNROLLED  thrpt   30  2.122 ± 0.131  ops/us
 *
-Benchmark                                (type)   Mode  Cnt  Score   Error   Units
-ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  thrpt   30  2.694 ± 0.210  ops/us
-ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  thrpt   30  2.136 ± 0.103  ops/us
-ListWriteHeavyBench.twoThreads    ELIM_UNROLLED  thrpt   30  1.546 ± 0.082  ops/us
+* Benchmark                                (type)  Mode  Cnt  Score   Error  Units
+ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  avgt   30  2.361 ± 0.153  us/op
+ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  avgt   30  1.369 ± 0.054  us/op
+ListWriteHeavyBench.twoThreads    ELIM_UNROLLED  avgt   30  0.940 ± 0.061  us/op
 * */
 
-@BenchmarkMode(Mode.Throughput)
+@BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 @Warmup(iterations = 10, time = 1)
@@ -83,7 +87,7 @@ ListWriteHeavyBench.twoThreads    ELIM_UNROLLED  thrpt   30  1.546 ± 0.082  ops
 public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     private ConcurrentListSet<Integer> set;
 
-    @Param({"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED", "ELIM_UNROLLED"})
+    @Param({/*"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED",*/ "ELIM_UNROLLED"})
     private String type;
 
     @Setup
