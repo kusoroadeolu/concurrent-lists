@@ -1,5 +1,7 @@
 package io.github.kusoroadeolu.sl;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class Utils {
@@ -9,6 +11,7 @@ public final class Utils {
     public static int generateLevel(int height) {
         double r = Math.max(ThreadLocalRandom.current().nextDouble(), Double.MIN_VALUE);
         int level = (int)(Math.log(r) / LOG_PROBABILITY) + 1;
+        ScheduledExecutorService s = Executors.newScheduledThreadPool(10);
         return Math.min(level, height - 1);
     }
 }

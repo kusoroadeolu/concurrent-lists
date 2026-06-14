@@ -4,6 +4,7 @@ package io.github.kusoroadeolu.sl;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.*;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 //A lock free ordered linked singly linked list set
 // States - marked (linearization point for removal), null key (means the pred node has been logically fully deleted), next pointer marked as a tombstone (node is going to be unlinked, don't cas to it's next ptr)
@@ -137,26 +138,23 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
 
     //Returns the next undead node
     Node<T> helpUnlink(Node<T> pred, Node<T> curr) {
-        var s = curr;
-        Node<T> next;
-        Node<T> dummy;
+        Node<T> n;
+        Node<T> d = null;
 
-        //If we find any marked node that's not a dummy while traversing, we need to ensure it already has it's dummy tombstone, otherwise we can have lost writs
-        while (curr.isMarked()) {
-            if (!curr.isDummy()) {
-                dummy = new Node<>(null, true);
-                do {
-                    next = curr.loNext();
-                    if (next.isDummy()) break;
-                    dummy.spNext(next); //Backed by cas
-                } while (!curr.casNext(next, dummy));
+        for (;;) {
+            n = curr.loNext();
+            if (n.isDummy()) {
+                n = n.loNext();
+                break;
+            } else {
+                if (d == null) d = new Node<>(null, true);
+                d.spNext(n);
+                if (d.casNext(n, d)) break;
             }
-
-           curr = curr.loNext(); //We might not have been the ones to cas dummy to so we still need to use curr to move ahead
         }
 
-        pred.casNext(s, curr); //try to link. failure is alright, another node has unlinked this , all we need is the new unmarked (at this point) curr node
-        return curr;
+        pred.casNext(curr, n); //try to link. failure is alright, another node has unlinked this , all we need is the new unmarked (at this point) curr node
+        return n;
     }
 
     @Override
