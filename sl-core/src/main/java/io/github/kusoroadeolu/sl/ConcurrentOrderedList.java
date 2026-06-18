@@ -4,7 +4,6 @@ package io.github.kusoroadeolu.sl;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.*;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 //A lock free ordered linked singly linked list set
 // States - marked (linearization point for removal), null key (means the pred node has been logically fully deleted), next pointer marked as a tombstone (node is going to be unlinked, don't cas to it's next ptr)
@@ -29,7 +28,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 /**
  * @author kusoroadeolu
  * */
-public class ConcurrentOrderedList<T extends Comparable<T>> implements ConcurrentListSet<T>{
+public class ConcurrentOrderedList<T extends Comparable<T>> implements ConcurrentCollection<T> {
     private final Node<T> left;
     private final Node<T> right;
 

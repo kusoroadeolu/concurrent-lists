@@ -5,12 +5,9 @@ import org.openjdk.jcstress.infra.results.I_Result;
 import org.openjdk.jcstress.infra.results.Z_Result;
 
 import java.util.List;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.IntStream;
 
 import static org.openjdk.jcstress.annotations.Expect.ACCEPTABLE;
-import static org.openjdk.jcstress.annotations.Expect.ACCEPTABLE_INTERESTING;
 
 public class ListStress {
 
@@ -18,7 +15,7 @@ public class ListStress {
     @Outcome(id = "1", expect = ACCEPTABLE, desc = "Invariant maintained")
     @State
     public static class UniqueInvariantStress {
-        public final ConcurrentListSet<Integer> set;
+        public final ConcurrentCollection<Integer> set;
 
         public UniqueInvariantStress() {
             this.set = new ConcurrentOrderedList<>();
@@ -52,7 +49,7 @@ public class ListStress {
     @Outcome(id = "1", expect = ACCEPTABLE, desc = "Invariant maintained")
     @State
     public static class AddRemoveTest {
-        public  ConcurrentListSet<Integer> set;
+        public ConcurrentCollection<Integer> set;
 
         public AddRemoveTest() {
             this.set = new ConcurrentOrderedList<>();
@@ -84,7 +81,7 @@ public class ListStress {
     @Outcome(id = "1", expect = ACCEPTABLE, desc = "Invariant maintained")
     @State
     public static class RemoveInvariantStress {
-        public final ConcurrentListSet<Integer> set;
+        public final ConcurrentCollection<Integer> set;
 
         public RemoveInvariantStress() {
             this.set = new ConcurrentOrderedList<>();

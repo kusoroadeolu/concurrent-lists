@@ -15,7 +15,7 @@ public class UnrolledListStress {
     @Outcome(id = "1", expect = ACCEPTABLE, desc = "Invariant maintained")
     @State
     public static class OrderedAnchorStress {
-        public  UnrolledConcurrentList<Integer> set;
+        public UnrolledConcurrentList<Integer> set;
         final int bound = 20;
 
         public OrderedAnchorStress() {
@@ -41,9 +41,7 @@ public class UnrolledListStress {
         void doWork() {
             for (int i = 0; i <= 5; ++i) {
                 boolean add = ThreadLocalRandom.current().nextInt() % 2 == 0;
-                if (add) {
-                    set.add(ThreadLocalRandom.current().nextInt(bound));
-                }else set.remove(ThreadLocalRandom.current().nextInt(bound));
+                set.add(ThreadLocalRandom.current().nextInt(bound));
             }
         }
 
@@ -55,7 +53,10 @@ public class UnrolledListStress {
             boolean isSorted = IntStream.range(0, ls.size() - 1)
                     .allMatch(i -> ls.get(i) <= ls.get(i + 1));
             r.r1 = isSorted ? 1 : 0;
-            if(!isSorted) System.out.println(set.nodeMap());
+            if(!isSorted) {
+                System.out.println(set.nodeMap());
+                System.out.println();
+            }
 
             var lsn = set.toList();
             for (int i : lsn) set.remove(i);

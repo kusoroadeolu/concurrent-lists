@@ -1,7 +1,7 @@
 package io.github.kusoroadeolu.sl.jmh;
 
 import io.github.kusoroadeolu.sl.EliminationMetrics;
-import io.github.kusoroadeolu.sl.EliminationUnrolledLinkedList;
+import io.github.kusoroadeolu.sl.EliminationUnrolledConcurrentList;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.profile.JavaFlightRecorderProfiler;
@@ -24,15 +24,15 @@ import java.util.concurrent.TimeUnit;
 
 /* 100% Writes
 Benchmark                                                 (keySpaceSize)         (type)   Mode  Cnt  Score   Error   Units
-UnrolledListContentionBenchmark.fullWrite                             64  ELIM_UNROLLED  thrpt   30  3.131 ± 0.096  ops/us
-UnrolledListContentionBenchmark.fullWrite:arenaSuccesses              64  ELIM_UNROLLED  thrpt   30  1.217 ± 0.037  ops/us
-UnrolledListContentionBenchmark.fullWrite:nodeSuccesses               64  ELIM_UNROLLED  thrpt   30  1.307 ± 0.045  ops/us
-UnrolledListContentionBenchmark.fullWrite                            128  ELIM_UNROLLED  thrpt   30  2.132 ± 0.426  ops/us
-UnrolledListContentionBenchmark.fullWrite:arenaSuccesses             128  ELIM_UNROLLED  thrpt   30  0.806 ± 0.183  ops/us
-UnrolledListContentionBenchmark.fullWrite:nodeSuccesses              128  ELIM_UNROLLED  thrpt   30  0.931 ± 0.157  ops/us
-UnrolledListContentionBenchmark.fullWrite                            256  ELIM_UNROLLED  thrpt   30  2.363 ± 0.475  ops/us
-UnrolledListContentionBenchmark.fullWrite:arenaSuccesses             256  ELIM_UNROLLED  thrpt   30  0.911 ± 0.191  ops/us
-UnrolledListContentionBenchmark.fullWrite:nodeSuccesses              256  ELIM_UNROLLED  thrpt   30  0.999 ± 0.189  ops/us */
+ZipfianBenchmark.fullWrite                             64  ELIM_UNROLLED  thrpt   30  3.131 ± 0.096  ops/us
+ZipfianBenchmark.fullWrite:arenaSuccesses              64  ELIM_UNROLLED  thrpt   30  1.217 ± 0.037  ops/us
+ZipfianBenchmark.fullWrite:nodeSuccesses               64  ELIM_UNROLLED  thrpt   30  1.307 ± 0.045  ops/us
+ZipfianBenchmark.fullWrite                            128  ELIM_UNROLLED  thrpt   30  2.132 ± 0.426  ops/us
+ZipfianBenchmark.fullWrite:arenaSuccesses             128  ELIM_UNROLLED  thrpt   30  0.806 ± 0.183  ops/us
+ZipfianBenchmark.fullWrite:nodeSuccesses              128  ELIM_UNROLLED  thrpt   30  0.931 ± 0.157  ops/us
+ZipfianBenchmark.fullWrite                            256  ELIM_UNROLLED  thrpt   30  2.363 ± 0.475  ops/us
+ZipfianBenchmark.fullWrite:arenaSuccesses             256  ELIM_UNROLLED  thrpt   30  0.911 ± 0.191  ops/us
+ZipfianBenchmark.fullWrite:nodeSuccesses              256  ELIM_UNROLLED  thrpt   30  0.999 ± 0.189  ops/us */
 
 /*
 * so i did some profiling(for the suspicious results) and its pretty surprising.
@@ -53,7 +53,7 @@ UnrolledListContentionBenchmark.fullWrite:nodeSuccesses              256  ELIM_U
 * While this didnt fully get rid of the issue(as the high err margins in some results) it increased the number of successful eliminations in the arena to an almost 1:1 ratio with the node successes
 * and reduced the amount of times this happened throughout the benchmark
 * */
-public class UnrolledListContentionBenchmark {
+public class ZipfianBenchmark {
 
     @Param({"64", "128", "256"})
     int keySpaceSize;
@@ -61,7 +61,7 @@ public class UnrolledListContentionBenchmark {
     @Param({"ELIM_UNROLLED"})
     private String type;
 
-    private EliminationUnrolledLinkedList<Integer> set;
+    private EliminationUnrolledConcurrentList<Integer> set;
     private ZipfianGenerator zipf;
 
     @State(Scope.Thread)
@@ -77,7 +77,7 @@ public class UnrolledListContentionBenchmark {
         }
 
         @TearDown(Level.Iteration)
-        public void teardown(UnrolledListContentionBenchmark benchmark) {
+        public void teardown(ZipfianBenchmark benchmark) {
             EliminationMetrics m = benchmark.set.metrics();
             nodeSuccesses  = m.nodeSuccesses();
             arenaSuccesses = m.arenaSuccesses();
@@ -99,7 +99,7 @@ public class UnrolledListContentionBenchmark {
     public void setup() {
 
         set = switch (type) {
-            case "ELIM_UNROLLED" -> new EliminationUnrolledLinkedList<>();
+            case "ELIM_UNROLLED" -> new EliminationUnrolledConcurrentList<>();
             default -> throw new IllegalArgumentException();
         };
         zipf      = new ZipfianGenerator(keySpaceSize, 2.0);
@@ -117,7 +117,7 @@ public class UnrolledListContentionBenchmark {
     }
 
 
-    private void op(EliminationUnrolledLinkedList<Integer> set, ThreadState ts, Blackhole bh) {
+    private void op(EliminationUnrolledConcurrentList<Integer> set, ThreadState ts, Blackhole bh) {
         int key = zipf.nextInt(ts.rng);
         if (ts.rng.nextDouble() < 0.80) {
             if (ts.rng.nextBoolean()) bh.consume(set.add(key));
@@ -127,7 +127,7 @@ public class UnrolledListContentionBenchmark {
         }
     }
 
-    private void fullWrite(EliminationUnrolledLinkedList<Integer> set, ThreadState ts, Blackhole bh) {
+    private void fullWrite(EliminationUnrolledConcurrentList<Integer> set, ThreadState ts, Blackhole bh) {
         int key = zipf.nextInt(ts.rng);
         if (ts.rng.nextDouble(1) < 0.5) bh.consume(set.add(key));
         else bh.consume(set.remove(key));
@@ -165,7 +165,7 @@ public class UnrolledListContentionBenchmark {
     static class BenchRunner {
         static void main() throws RunnerException {
             Options options = new OptionsBuilder()
-                    .include(UnrolledListContentionBenchmark.class.getSimpleName())
+                    .include(ZipfianBenchmark.class.getSimpleName())
                     .addProfiler(JavaFlightRecorderProfiler.class, "dir=C:\\jfr-sl")
                     .build();
             new org.openjdk.jmh.runner.Runner(options).run();        }

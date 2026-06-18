@@ -78,23 +78,23 @@ ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  avgt   30  1.369 ± 0.054  us/o
 ListWriteHeavyBench.twoThreads    ELIM_UNROLLED  avgt   30  0.940 ± 0.061  us/op
 * */
 
-@BenchmarkMode(Mode.AverageTime)
+@BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 @Warmup(iterations = 10, time = 1)
 @Measurement(iterations = 10, time = 1)
 @Fork(3)
 public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
-    private ConcurrentListSet<Integer> set;
+    private ConcurrentCollection<Integer> set;
 
-    @Param({/*"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED",*/ "ELIM_UNROLLED"})
+    @Param({"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED", "ELIM_UNROLLED"})
     private String type;
 
     @Setup
     public void setup() {
         set = switch (type) {
             case "LF_FR" -> new ConcurrentOrderedList<>();
-            case "ELIM_UNROLLED" -> new EliminationUnrolledLinkedList<>();
+            case "ELIM_UNROLLED" -> new EliminationUnrolledConcurrentList<>();
             case "LAZY" -> new LazySyncList<>();
             case "LAZY_COARSE" -> new LazyCoarseSyncList<>();
             case "LOCK" -> new LockedOrderedLL<>();

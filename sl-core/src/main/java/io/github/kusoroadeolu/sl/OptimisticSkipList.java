@@ -4,7 +4,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -60,7 +59,7 @@ import static io.github.kusoroadeolu.sl.Utils.generateLevel;
  * @author kusoroadeolu
  * */
 @SuppressWarnings("unchecked")
-public class OptimisticSkipList<T extends Comparable<T>> implements ConcurrentListSet<T> {
+public class OptimisticSkipList<T extends Comparable<T>> implements ConcurrentCollection<T> {
     private final Node<T> left;
     private final Node<T> right;
     private final int height;

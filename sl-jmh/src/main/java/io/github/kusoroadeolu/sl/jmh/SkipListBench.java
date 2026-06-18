@@ -9,6 +9,7 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
+import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ThreadLocalRandom;
@@ -72,7 +73,7 @@ SkipListBench.twoThreads       OPT  avgt   30    0.301 ± 0.020  us/op
 SkipListBench.twoThreads        FG  avgt   30    0.676 ± 0.031  us/op
 * */
 public class SkipListBench {
-    private Set<Integer> set;
+    private Collection<Integer> set;
     @Param({"JDK", "OPT", "FG"}) //JDK, Ours, fine grained(from a random repository that implemented the same paper)
     private String type;
 

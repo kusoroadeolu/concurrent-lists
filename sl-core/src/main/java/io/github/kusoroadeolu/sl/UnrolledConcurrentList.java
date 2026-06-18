@@ -44,7 +44,7 @@ import java.util.concurrent.locks.ReentrantLock;
 * */
 
 @SuppressWarnings("unchecked")
-public class UnrolledConcurrentList<T extends Comparable<T>> implements ConcurrentListSet<T>{
+public class UnrolledConcurrentList<T extends Comparable<T>> implements ConcurrentCollection<T> {
     private final Node<T> left;
     private final Node<T> right;
     private final ThreadLocal<LocalArrays<T>> localArrays;

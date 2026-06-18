@@ -15,7 +15,7 @@ import java.util.concurrent.locks.ReentrantLock;
 *
 * A simple optimization made in this impl is validation the state of a node before acquiring the node locks
 * * */
-public class LazySyncList<T extends Comparable<T>> implements ConcurrentListSet<T>{
+public class LazySyncList<T extends Comparable<T>> implements ConcurrentCollection<T> {
 
     private final Node<T> left;
     private final Node<T> right;

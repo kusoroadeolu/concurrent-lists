@@ -64,7 +64,7 @@ ListReadHeavyBench.twoThreads    UNROLLED  avgt   30  0.666 ± 0.047  us/op
 @Measurement(iterations = 10, time = 1)
 @Fork(3)
 public class ListReadHeavyBench {
-    private ConcurrentListSet<Integer> set;
+    private ConcurrentCollection<Integer> set;
 
     @Param({"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED"})
     private String type;

@@ -7,11 +7,11 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static io.github.kusoroadeolu.sl.EliminationUnrolledLinkedList.free;
+import static io.github.kusoroadeolu.sl.EliminationUnrolledConcurrentList.free;
 
 
 public class EliminationNode<T extends Comparable<T>> {
-    private static final int NCPU = Runtime.getRuntime().availableProcessors();
+    static final int NCPU = Runtime.getRuntime().availableProcessors();
     final AtomicReferenceArray<ThreadInfo<T>> arena;
 
     public final T anchor;
@@ -149,9 +149,6 @@ public class EliminationNode<T extends Comparable<T>> {
     }
 
     public record ThreadInfo<T> (T value, UnrolledConcurrentList.Operation op){}
-
-
-
 
     static class SentinelEliminationNode<T extends Comparable<T>> extends EliminationNode<T> {
         public SentinelEliminationNode() {

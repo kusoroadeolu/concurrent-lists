@@ -24,7 +24,7 @@ import static io.github.kusoroadeolu.sl.EFUnrolledConcurrentList.Status.*;
  * This is pretty much experimental, and the results are really not that great due to all the
  * overhead of retrying if a node is deleted and the overhead of verifying i
  *  */
-public class EFUnrolledConcurrentList<T extends Comparable<T>>  implements ConcurrentListSet<T>{
+public class EFUnrolledConcurrentList<T extends Comparable<T>>  implements ConcurrentCollection<T> {
 
     private final AtomicIntegerArray arena;
     private final AtomicReferenceArray<ThreadNode<T>> locations;

@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
+import static io.github.kusoroadeolu.sl.EliminationNode.NCPU;
 import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.*;
 
 /*
@@ -41,8 +42,7 @@ with values with close key spaces, so threads collide more often in nodes near t
 Obviously more improvements can be made to this
 For example the start index calculation rather than using thread id. This structure doesnt not maintain the set invariant
 */
-public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements ConcurrentListSet<T>{
-    private static final int NCPU = Runtime.getRuntime().availableProcessors();
+public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implements ConcurrentCollection<T> {
     private final int arrayCap;
     private final int minFull;
     private final int maxMerge;
@@ -56,11 +56,11 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
     private static final int ARENA_LEN = NCPU / 2;
     private static final int ARENA_MASK = ARENA_LEN - 1;
 
-    public EliminationUnrolledLinkedList() {
+    public EliminationUnrolledConcurrentList() {
         this(64, 16);
     }
 
-    public EliminationUnrolledLinkedList(int arrCap, int minFull) {
+    public EliminationUnrolledConcurrentList(int arrCap, int minFull) {
         this.left = new EliminationNode.SentinelEliminationNode<>();
         this.right = new EliminationNode.SentinelEliminationNode<>();
         left.lock();
@@ -259,7 +259,7 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
         }
     }
 
-    //We intentionally don't start at zero to allow threads to spread out across the array and prevent contention at that index
+    //We intentionally don't start at zero to allow threads to spread out across the array and prevent contention at the ('0') index
     boolean scanAndMatch(ThreadInfo<T> ours, AtomicReferenceArray<ThreadInfo<T>> arena, int start){
         for (int i = 0; i < ARENA_LEN; ++i) {
             int slot = (start + i) & ARENA_MASK;
@@ -306,7 +306,7 @@ public class EliminationUnrolledLinkedList<T extends Comparable<T>> implements C
         return false; //Failed to match
     }
 
-    /*======================= COPIED METHODS FROM THE ORIGINAL ADAPTED TO USE ELIMINATION NODE ==============================*/
+    // ======================= COPIED METHODS FROM THE ORIGINAL ADAPTED TO USE ELIMINATION NODE ==============================
 
     static <T extends Comparable<T>>void split(Object[] array, int arrayCap ,T t ,EliminationNode<T>[] nodes) {
         int len = arrayCap + 1;

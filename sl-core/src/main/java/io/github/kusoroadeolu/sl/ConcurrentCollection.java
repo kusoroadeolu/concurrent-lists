@@ -5,7 +5,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-public interface ConcurrentListSet<T> extends Set<T> {
+public interface ConcurrentCollection<T> extends Collection<T> {
     boolean add(T t);
 
     boolean remove(Object t);
