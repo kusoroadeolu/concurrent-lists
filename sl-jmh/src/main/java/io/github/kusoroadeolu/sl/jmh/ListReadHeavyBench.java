@@ -19,10 +19,6 @@ ListReadHeavyBench.fourThreads          LF_FR  thrpt   30  0.043 ± 0.001  ops/u
 ListReadHeavyBench.fourThreads          LAZY  thrpt   30  0.047 ±  0.003  ops/us
 ListReadHeavyBench.fourThreads          LOCK  thrpt   30  0.017 ±  0.001  ops/us
 ListReadHeavyBench.fourThreads   LAZY_COARSE  thrpt   30  0.051 ±  0.001  ops/us
-ListReadHeavyBench.twoThreads           LF_FR  thrpt   30  0.025 ± 0.001  ops/us
-ListReadHeavyBench.twoThreads           LAZY  thrpt   30  0.029 ±  0.002  ops/us
-ListReadHeavyBench.twoThreads           LOCK  thrpt   30  0.018 ±  0.001  ops/us
-ListReadHeavyBench.twoThreads    LAZY_COARSE  thrpt   30  0.032 ±  0.001  ops/us
 * */
 
 /*
@@ -35,10 +31,6 @@ ListReadHeavyBench.fourThreads          LF_FR  avgt   30   89.309 ± 2.178  us/o
 ListReadHeavyBench.fourThreads          LAZY  avgt   30   76.837 ±  1.412  us/op
 ListReadHeavyBench.fourThreads          LOCK  avgt   30  252.087 ± 14.362  us/op
 ListReadHeavyBench.fourThreads   LAZY_COARSE  avgt   30   87.068 ±  6.050  us/op
-ListReadHeavyBench.twoThreads           LF_FR  avgt   30   75.362 ± 2.672  us/op
-ListReadHeavyBench.twoThreads           LAZY  avgt   30   83.519 ±  4.822  us/op
-ListReadHeavyBench.twoThreads           LOCK  avgt   30  157.357 ± 16.030  us/op
-ListReadHeavyBench.twoThreads    LAZY_COARSE  avgt   30   79.521 ±  3.725  us/op
 * */
 
 
@@ -46,12 +38,10 @@ ListReadHeavyBench.twoThreads    LAZY_COARSE  avgt   30   79.521 ±  3.725  us/o
 * Benchmark                          (type)   Mode  Cnt   Score   Error   Units
 ListReadHeavyBench.eightThreads  UNROLLED  thrpt   30  5.511 ± 0.100  ops/us
 ListReadHeavyBench.fourThreads   UNROLLED  thrpt   30  4.318 ± 0.062  ops/us
-ListReadHeavyBench.twoThreads    UNROLLED  thrpt   30  3.045 ± 0.177  ops/us
 *
 Benchmark                          (type)  Mode  Cnt  Score   Error  Units
 ListReadHeavyBench.eightThreads  UNROLLED  avgt   30  1.409 ± 0.022  us/op
 ListReadHeavyBench.fourThreads   UNROLLED  avgt   30  0.931 ± 0.022  us/op
-ListReadHeavyBench.twoThreads    UNROLLED  avgt   30  0.666 ± 0.047  us/op
 * */
 
 
@@ -92,12 +82,6 @@ public class ListReadHeavyBench {
         }
 
         ls.clear();
-    }
-
-    @Threads(2)
-    @Benchmark
-    public void twoThreads(Blackhole bh) {
-        doWork(bh);
     }
 
     @Threads(4)

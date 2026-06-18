@@ -23,10 +23,6 @@ ListWriteHeavyBench.fourThreads          LF_FR  thrpt   30  0.080 ± 0.003  ops/
 ListWriteHeavyBench.fourThreads          LAZY  thrpt   30  0.081 ±  0.002  ops/us
 ListWriteHeavyBench.fourThreads          LOCK  thrpt   30  0.026 ±  0.001  ops/us
 ListWriteHeavyBench.fourThreads   LAZY_COARSE  thrpt   30  0.083 ±  0.004  ops/us
-ListWriteHeavyBench.twoThreads           LF_FR  thrpt   30  0.043 ± 0.001  ops/us
-ListWriteHeavyBench.twoThreads           LAZY  thrpt   30  0.053 ±  0.002  ops/us
-ListWriteHeavyBench.twoThreads           LOCK  thrpt   30  0.029 ±  0.001  ops/us
-ListWriteHeavyBench.twoThreads    LAZY_COARSE  thrpt   30  0.054 ±  0.002  ops/us
 * */
 
 /*
@@ -39,10 +35,6 @@ ListWriteHeavyBench.fourThreads          LF_FR  avgt   30  51.607 ± 2.077  us/o
 ListWriteHeavyBench.fourThreads          LAZY  avgt   30   45.701 ±  1.228  us/op
 ListWriteHeavyBench.fourThreads          LOCK  avgt   30  153.047 ±  1.507  us/op
 ListWriteHeavyBench.fourThreads   LAZY_COARSE  avgt   30   45.808 ±  1.560  us/op
-ListWriteHeavyBench.twoThreads           LF_FR  avgt   30  46.381 ± 1.604  us/op
-ListWriteHeavyBench.twoThreads           LAZY  avgt   30   37.030 ±  1.524  us/op
-ListWriteHeavyBench.twoThreads           LOCK  avgt   30   68.582 ±  1.676  us/op
-ListWriteHeavyBench.twoThreads    LAZY_COARSE  avgt   30   36.923 ±  1.415  us/op
 * */
 
 //UNROLLED Variants
@@ -50,19 +42,16 @@ ListWriteHeavyBench.twoThreads    LAZY_COARSE  avgt   30   36.923 ±  1.415  us/
 Benchmark                           (type)   Mode  Cnt  Score   Error   Units
 ListWriteHeavyBench.eightThreads  UNROLLED  thrpt   30  3.871 ± 0.056  ops/us
 ListWriteHeavyBench.fourThreads   UNROLLED  thrpt   30  2.512 ± 0.043  ops/us
-ListWriteHeavyBench.twoThreads    UNROLLED  thrpt   30  1.706 ± 0.079  ops/us
 
 Benchmark                           (type)  Mode  Cnt  Score   Error  Units
 ListWriteHeavyBench.eightThreads  UNROLLED  avgt   30  1.938 ± 0.032  us/op
 ListWriteHeavyBench.fourThreads   UNROLLED  avgt   30  1.194 ± 0.022  us/op
-ListWriteHeavyBench.twoThreads    UNROLLED  avgt   30  0.844 ± 0.044  us/op
 * */
 
 /*
 Benchmark                              (type)   Mode  Cnt  Score   Error   Units
 ListWriteHeavyBench.eightThreads  EF_UNROLLED  thrpt   30  0.041 ± 0.006  ops/us
 ListWriteHeavyBench.fourThreads   EF_UNROLLED  thrpt   30  0.038 ± 0.005  ops/us
-ListWriteHeavyBench.twoThreads    EF_UNROLLED  thrpt   30  0.032 ± 0.003  ops/us
 *
 * */
 
@@ -70,15 +59,23 @@ ListWriteHeavyBench.twoThreads    EF_UNROLLED  thrpt   30  0.032 ± 0.003  ops/u
 * Benchmark                                (type)   Mode  Cnt  Score   Error   Units
 ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  thrpt   30  3.276 ± 0.177  ops/us
 ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  thrpt   30  2.983 ± 0.047  ops/us
-ListWriteHeavyBench.twoThreads    ELIM_UNROLLED  thrpt   30  2.122 ± 0.131  ops/us
 *
 * Benchmark                                (type)  Mode  Cnt  Score   Error  Units
 ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  avgt   30  2.361 ± 0.153  us/op
 ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  avgt   30  1.369 ± 0.054  us/op
-ListWriteHeavyBench.twoThreads    ELIM_UNROLLED  avgt   30  0.940 ± 0.061  us/op
 * */
 
-@BenchmarkMode(Mode.Throughput)
+/*
+* Benchmark                                (type)  Mode  Cnt  Score   Error  Units
+* ListWriteHeavyBench.eightThreads  LOCAL_ELIM  thrpt   30  2.303 ± 0.171  ops/us
+ListWriteHeavyBench.fourThreads   LOCAL_ELIM  thrpt   30  2.073 ± 0.087  ops/us
+*
+* Benchmark                             (type)  Mode  Cnt  Score   Error  Units
+ListWriteHeavyBench.eightThreads  LOCAL_ELIM  avgt   30  3.091 ± 0.077  us/op
+ListWriteHeavyBench.fourThreads   LOCAL_ELIM  avgt   30  1.871 ± 0.078  us/op
+* */
+
+@BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 @Warmup(iterations = 10, time = 1)
@@ -87,7 +84,7 @@ ListWriteHeavyBench.twoThreads    ELIM_UNROLLED  avgt   30  0.940 ± 0.061  us/o
 public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     private ConcurrentCollection<Integer> set;
 
-    @Param({"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED", "ELIM_UNROLLED"})
+    @Param({/*"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED", "ELIM_UNROLLED",*/ "LOCAL_ELIM"})
     private String type;
 
     @Setup
@@ -100,6 +97,7 @@ public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
             case "LOCK" -> new LockedOrderedLL<>();
             case "UNROLLED" -> new UnrolledConcurrentList<>();
             case "EF_UNROLLED" -> new EFUnrolledConcurrentList<>();
+            case "LOCAL_ELIM" -> new LocalEFUnrolledConcurrentList<>();
             default -> throw new IllegalArgumentException();
         };
 
@@ -127,14 +125,6 @@ public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     public void fourThreads(Blackhole bh) {
         doWork(bh);
     }
-
-
-    @Threads(2)
-    @Benchmark
-    public void twoThreads(Blackhole bh) {
-        doWork(bh);
-    }
-
 
     private void doWork(Blackhole bh) {
         int key = ThreadLocalRandom.current().nextInt(10_000);

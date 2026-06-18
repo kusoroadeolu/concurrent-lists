@@ -27,8 +27,6 @@ SkipListBench.eightThreads     JDK  thrpt   30  11.884 ± 0.257  ops/us
 SkipListBench.eightThreads     OPT  thrpt   30   3.149 ± 0.113  ops/us
 SkipListBench.fourThreads      JDK  thrpt   30   9.010 ± 0.169  ops/us
 SkipListBench.fourThreads      OPT  thrpt   30   2.609 ± 0.313  ops/us
-SkipListBench.twoThreads       JDK  thrpt   30   6.304 ± 0.351  ops/us
-SkipListBench.twoThreads       OPT  thrpt   30   2.039 ± 0.259  ops/us
 * */
 
 // After the compare to optimization
@@ -36,7 +34,6 @@ SkipListBench.twoThreads       OPT  thrpt   30   2.039 ± 0.259  ops/us
 *Benchmark                    Mode  Cnt  Score   Error   Units
 SkipListBench.eightThreads  thrpt   30  5.335 ± 0.272  ops/us
 SkipListBench.fourThreads   thrpt   30  4.292 ± 0.203  ops/us
-SkipListBench.twoThreads    thrpt   30  3.167 ± 0.212  ops/us
 * */
 
 //After the current level optimization
@@ -44,7 +41,6 @@ SkipListBench.twoThreads    thrpt   30  3.167 ± 0.212  ops/us
 Benchmark                    Mode  Cnt  Score   Error   Units
 SkipListBench.eightThreads  thrpt   30  9.133 ± 0.285  ops/us
 SkipListBench.fourThreads   thrpt   30  6.972 ± 0.138  ops/us
-SkipListBench.twoThreads    thrpt   30  5.397 ± 0.295  ops/us
 * */
 
 /*
@@ -55,9 +51,6 @@ SkipListBench.eightThreads      FG  thrpt   30   4.420 ±  0.094  ops/us
 SkipListBench.fourThreads      JDK  thrpt   30   9.477 ±  0.147  ops/us
 SkipListBench.fourThreads      OPT  thrpt   30   9.362 ±  0.592  ops/us
 SkipListBench.fourThreads       FG  thrpt   30   3.902 ±  0.103  ops/us
-SkipListBench.twoThreads       JDK  thrpt   30   6.405 ±  0.297  ops/us
-SkipListBench.twoThreads       OPT  thrpt   30   6.272 ±  0.509  ops/us
-SkipListBench.twoThreads        FG  thrpt   30   3.112 ±  0.177  ops/us
 * */
 
 /*
@@ -68,9 +61,6 @@ SkipListBench.eightThreads      FG  avgt   30    1.666 ± 0.051  us/op
 SkipListBench.fourThreads      JDK  avgt   30    0.421 ± 0.021  us/op
 SkipListBench.fourThreads      OPT  avgt   30    0.388 ± 0.014  us/op
 SkipListBench.fourThreads       FG  avgt   30    0.982 ± 0.036  us/op
-SkipListBench.twoThreads       JDK  avgt   30    0.339 ± 0.026  us/op
-SkipListBench.twoThreads       OPT  avgt   30    0.301 ± 0.020  us/op
-SkipListBench.twoThreads        FG  avgt   30    0.676 ± 0.031  us/op
 * */
 public class SkipListBench {
     private Collection<Integer> set;
@@ -86,12 +76,6 @@ public class SkipListBench {
             default -> throw new IllegalArgumentException();
         };
 
-    }
-
-    @Threads(2)
-    @Benchmark
-    public void twoThreads(Blackhole bh) {
-        doWork(bh);
     }
 
     @Threads(4)
