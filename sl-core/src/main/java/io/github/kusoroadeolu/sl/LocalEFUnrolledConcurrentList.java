@@ -119,12 +119,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
 
                             curr.soMarked();
                             n1.spNext(n2);
-                            n1.lock();
-                            try {
-                                n2.spNext(succ);
-                            }finally {
-                                n1.unlock();
-                            }
+                            n2.spNext(succ);
                             pred.soNext(n1); //Linearization point, makes n1 and n2 visible
 
 

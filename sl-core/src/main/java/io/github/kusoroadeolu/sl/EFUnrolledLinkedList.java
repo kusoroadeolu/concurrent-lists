@@ -86,12 +86,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
 
                         curr.soMarked();
                         n1.spNext(n2);
-                        n1.lock();
-                        try {
-                            n2.spNext(succ);
-                        }finally {
-                            n1.unlock();
-                        }
+                        n2.spNext(succ);
                         pred.soNext(n1); //Linearization point
                         var h = tn.next;
                         while (h != null) {
@@ -114,7 +109,6 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
 
     void split(Object[] array, List<ThreadNode<T>> validNodes, int newSize ,Node<T>[] nodes) {
         Object[] copy = new Object[newSize];
-        var pred = nodes[0];
         int idx = 0;
         for (Object o : array) {
             if (o != null) copy[idx++] = o;

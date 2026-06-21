@@ -136,12 +136,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
 
                             curr.soMarked();
                             n1.spNext(n2);
-                            n1.lock();
-                            try {
-                                n2.spNext(succ);
-                            }finally {
-                                n1.unlock();
-                            }
+                            n2.spNext(succ);
                             pred.soNext(n1); //Linearization point
                             return true;
                         }finally {

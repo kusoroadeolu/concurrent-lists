@@ -72,6 +72,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         maxMerge = (int) (0.75 * arrCap);
     }
 
+
     public boolean add(T t) {
         Objects.requireNonNull(t);
         Node<T> l = left;
@@ -122,14 +123,11 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                         var n1 = nodes[0];
                         var n2 = nodes[1];
                         curr.soMarked();
+
                         n1.spNext(n2);
-                        n1.lock(); //Need this here for hb for plain reads of n1 next ptr
-                        try {
-                            n2.spNext(succ);
-                        }finally {
-                            n1.unlock();
-                        }
+                        n2.spNext(succ);
                         pred.soNext(n1); //Linearization point
+                        //Should provide more than enough synchronization to allow visibility of next writes
                         return true;
                     }finally {
                         curr.unlock();
