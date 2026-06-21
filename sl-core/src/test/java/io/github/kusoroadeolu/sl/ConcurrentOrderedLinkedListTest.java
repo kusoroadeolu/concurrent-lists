@@ -3,7 +3,6 @@ package io.github.kusoroadeolu.sl;
 import org.jetbrains.lincheck.Lincheck;
 import org.junit.jupiter.api.Test;
 
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;

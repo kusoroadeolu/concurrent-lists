@@ -24,6 +24,9 @@ import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.Operation;
 *
 * This class maintains the set invariant. I do believe the combining path might incur some overhead and perform worse than its base class
 * */
+/**
+ * @author kusoroadeolu
+ * */
 public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements ConcurrentCollection<T> {
 
     private final LocalEFNode<T> left;
@@ -81,6 +84,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
 
                         //pred - n - curr
                         n.soArray(0, value);
+                        n.increment(1);
                         n.spNext(curr);
                         pred.soNext(n);
                         return true;
@@ -92,7 +96,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
 
                     List<T> matchedList = new ArrayList<>(matchedValues);
                     int matchedSize = matchedValues.size();
-                    int size = curr.size(aCap);
+                    int size = curr.size();
                     int newSize = size + matchedSize;
 
                     if (newSize <= aCap) {
@@ -101,6 +105,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
                                 curr.soArray(i, matchedList.get(idx++));
                             }
                         }
+                        curr.increment(matchedSize);
                         return true;
                     } else { //Split
                         curr.lock(); //Lock to ensure no one can modify curr.next during the split
@@ -177,12 +182,13 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
             if (pred.tryLock()) {
                 try {
                     if (isNotValid(pred, curr) || !curr.containsPlain(t)) return false;
-                    int size = curr.size(aCap);
+                    int size = curr.size();
                     Map<T, CombiningRequest<T>> valuesToBeRemoved = new HashMap<>();
                     valuesToBeRemoved.put(t, ours);
                     scanAndMatchRemove(valuesToBeRemoved, nodes);
 
                     int removeCount = removeValues(valuesToBeRemoved, curr ,size, aCap);
+                    curr.decrement(removeCount);
                     int currSize = size - removeCount;
 
                     if (currSize > minFull) return true;
@@ -190,8 +196,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
                     try {
                         var succ = curr.lpNext();
                         if (currSize == 0) {
-                            curr.soMarked(); //Could we use a weaker mode for marked, maybe use the next write as a HB relationship. The issue though is
-                            //a thread has previously read prev and its next flag, it context switches, another thread adds and then marks
+                            curr.soMarked();
                             pred.soNext(succ);
                             return true;
                         }
@@ -200,7 +205,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
 
                         succ.lock(); //Ensure we lock succ to prevent other threads from making structural modifications to its array
                         try {
-                            int succSize = succ.size(aCap);
+                            int succSize = succ.size();
                             int total = currSize + succSize;
                             int[] emptyIndexes = new int[succSize];
                             findEmptyIndexes(emptyIndexes, aCap ,curr);
@@ -334,7 +339,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
         Object[] copy = new Object[newSize];
         int idx = 0;
         for (Object o : array) {
-            if (o != null) copy[idx++] = o;
+            if(o != null) copy[idx++] = o;
         }
 
         for (T h : matchedValues) {
@@ -349,8 +354,13 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
         int rem = newSize - half;
         System.arraycopy(copy, 0, arr1, 0, half);
         System.arraycopy(copy, half, arr2, 0, rem);
-        nodes[0] = new LocalEFNode<>(arr1);
-        nodes[1] = new LocalEFNode<>(arr2);
+        var n1 = new LocalEFNode<T>(arr1);
+        var n2 = new LocalEFNode<T>(arr2);
+        n1.increment(half);
+        n2.increment(rem);
+
+        nodes[0] = n1;
+        nodes[1] = n2;
     }
 
     static <T extends Comparable<T>>void merge(LocalEFNode<T> curr, LocalEFNode<T> succ, int arrayCap ,int[] indexes) {
@@ -364,6 +374,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
         }
 
         succ.soMarked();
+        curr.increment(succ.size());
         curr.soNext(succ.lpNext());
 
     }
@@ -505,7 +516,8 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
         }
 
         succ.soMarked();
-
+        curr.increment(toMove);
+        node.increment(succSize - toMove);
         node.spNext(succ.lpNext());
         curr.soNext(node);
     }
@@ -566,6 +578,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
         public final T anchor;
         public final Object[] array;
         final Lock lock;
+        int size;
         volatile boolean marked;
         volatile LocalEFNode<T> next;
 
@@ -650,15 +663,16 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
             return (LocalEFNode<T>) NEXT.getAcquire(this);
         }
 
-        int size(int arrayCap) {
-            int size = 0;
-            for (int i = 0; i < arrayCap; ++i) {
-                if (lpArray(i) != null) {
-                    ++size;
-                }
-            }
+        void increment(int by) {
+            SIZE.getAndAddRelease(this, by);
+        }
 
-            return size;
+        void decrement(int by) {
+            SIZE.getAndAddRelease(this, -by);
+        }
+
+        int size() {
+            return (int) SIZE.getAcquire(this);
         }
 
         boolean contains(T value) {
@@ -739,12 +753,14 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
     private static final VarHandle NEXT;
     private static final VarHandle ARRAY;
     private static final VarHandle STATUS;
+    private static final VarHandle SIZE;
 
     static {
         MethodHandles.Lookup l = MethodHandles.lookup();
         try {
             ARRAY = MethodHandles.arrayElementVarHandle(Object[].class);
             STATUS = l.findVarHandle(CombiningRequest.class, "status", Status.class);
+            SIZE = l.findVarHandle(LocalEFNode.class, "size", int.class);
             MARKED = l.findVarHandle(LocalEFNode.class, "marked", boolean.class);
             NEXT = l.findVarHandle(LocalEFNode.class, "next", LocalEFNode.class);
         } catch (Exception e) {

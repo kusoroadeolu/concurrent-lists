@@ -3,12 +3,15 @@ package io.github.kusoroadeolu.sl;
 import io.github.kusoroadeolu.sl.EFUnrolledConcurrentList.LocalValues;
 import io.github.kusoroadeolu.sl.EFUnrolledConcurrentList.Operation;
 import io.github.kusoroadeolu.sl.EFUnrolledConcurrentList.ThreadNode;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 
 import java.util.*;
 import java.util.stream.IntStream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Sequential stress tests for EFUnrolledLinkedList.

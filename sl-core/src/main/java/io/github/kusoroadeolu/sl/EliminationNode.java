@@ -19,6 +19,7 @@ public class EliminationNode<T extends Comparable<T>> {
     final Lock lock;
     volatile boolean marked;
     volatile EliminationNode<T> next;
+    int size;
 
     public EliminationNode(T anchor, int capacity) {
         this.anchor = anchor;
@@ -114,15 +115,16 @@ public class EliminationNode<T extends Comparable<T>> {
         return anchor + " : " + Arrays.toString(array);
     }
 
-    int size(int arrayCap) {
-        int size = 0;
-        for (int i = 0; i < arrayCap; ++i) {
-            if (lpArray(i) != null) {
-                ++size;
-            }
-        }
+    void increment(int by) {
+        SIZE.getAndAddRelease(this, by);
+    }
 
-        return size;
+    void decrement() {
+        SIZE.getAndAddRelease(this, -1);
+    }
+
+    int size() {
+        return (int) SIZE.getAcquire(this);
     }
 
     static <T extends Comparable<T>> AtomicReferenceArray<ThreadInfo<T>> fillArena() {
@@ -136,6 +138,7 @@ public class EliminationNode<T extends Comparable<T>> {
     private static final VarHandle MARKED;
     private static final VarHandle NEXT;
     private static final VarHandle ARRAY;
+    private static final VarHandle SIZE;
 
     static {
         MethodHandles.Lookup l = MethodHandles.lookup();
@@ -143,6 +146,7 @@ public class EliminationNode<T extends Comparable<T>> {
             ARRAY = MethodHandles.arrayElementVarHandle(Object[].class);
             MARKED = l.findVarHandle(EliminationNode.class, "marked", boolean.class);
             NEXT = l.findVarHandle(EliminationNode.class, "next", EliminationNode.class);
+            SIZE = l.findVarHandle(EliminationNode.class, "size", int.class);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

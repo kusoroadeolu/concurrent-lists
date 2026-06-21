@@ -10,7 +10,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import static io.github.kusoroadeolu.sl.EliminationNode.NCPU;
-import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.*;
+import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.Operation;
+import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.findNonNullIndex;
 
 /*
 An elimination based unrolled linked list.
@@ -42,6 +43,9 @@ with values with close key spaces, so threads collide more often in nodes near t
 Obviously more improvements can be made to this
 For example the start index calculation rather than using thread id. This structure doesnt not maintain the set invariant
 */
+/**
+ * @author kusoroadeolu
+ * */
 public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implements ConcurrentCollection<T> {
     private final int arrayCap;
     private final int minFull;
@@ -100,6 +104,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
                     if (curr == r || t.compareTo(curr.anchor) < 0) {
                         EliminationNode<T> n = new EliminationNode<>(t, aCap);
                         n.soArray(0, t);
+                        n.increment(1);
                         n.spNext(curr);
                         pred.soNext(n);
                         return true;
@@ -116,6 +121,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
 
                     if (size < aCap) {
                         curr.soArray(idx, t); //Linearization point
+                        curr.increment(1);
                         return true;
                     } else { //Split
                         curr.lock(); //Lock to ensure no one can modify curr.next during the split
@@ -173,10 +179,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
         var metrics = localArrays.metrics();
         ThreadInfo<T> info = null;
         while (true) {
-            //Doesnt violate the set invariant, for adds it will though
             if (!isPresent(t, l, r ,nodes, aCap)) {
-                var curr = nodes[1];
-                if (curr == r) return false;
                 //Try to scan and match
                 if (info == null) info = new ThreadInfo<>(t, Operation.REMOVE);
                 boolean succeed = scanAndMatch(info, nodes[1].arena, ThreadLocalRandom.current().nextInt());
@@ -193,15 +196,17 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
                     fillValueIndexAndSize(t, curr, aCap ,indices, UnrolledConcurrentList.Operation.REMOVE);
                     int index = indices[0];
                     int size = indices[1];
+
                     if (index  == -1) {
-                        if (curr == r) return false;
                         //Try to scan and match incase an add thread came while we held the lock
                         if (info == null) info = new ThreadInfo<>(t, Operation.REMOVE);
                         boolean succeed = scanAndMatch(info, curr.arena, ThreadLocalRandom.current().nextInt());
                         if (succeed) metrics.incArenaSuccesses();
                         return succeed;
                     }
+
                     nullifyIndex(index, aCap ,curr);
+                    curr.decrement();
                     int currSize = size - 1;
 
                     if (currSize > minFull) return true;
@@ -219,7 +224,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
 
                         succ.lock(); //Ensure we lock succ to prevent other threads from making structural modifications to its array
                         try {
-                            int succSize = succ.size(aCap);
+                            int succSize = succ.size();
                             int total = currSize + succSize;
                             int[] emptyIndexes = new int[succSize];
                             findEmptyIndexes(emptyIndexes, aCap ,curr);
@@ -306,7 +311,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
         return false; //Failed to match
     }
 
-    // ======================= COPIED METHODS FROM THE ORIGINAL ADAPTED TO USE ELIMINATION NODE ==============================
+    // ======================= COPIED METHODS FROM UNROLLED ADAPTED TO USE ELIMINATION NODE ==============================
 
     static <T extends Comparable<T>>void split(Object[] array, int arrayCap ,T t ,EliminationNode<T>[] nodes) {
         int len = arrayCap + 1;
@@ -322,8 +327,14 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
         int rem = len - half;
         System.arraycopy(copy, 0, arr1, 0, half);
         System.arraycopy(copy, half, arr2, 0, rem);
-        nodes[0] = new EliminationNode<>(arr1);
-        nodes[1] = new EliminationNode<>(arr2);
+        var n1 = new EliminationNode<T>(arr1);
+        var n2 = new EliminationNode<T>(arr2);
+
+        n1.increment(half);
+        n2.increment(rem);
+
+        nodes[0] = n1;
+        nodes[1] = n2;
     }
 
 
@@ -417,6 +428,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
         }
 
         succ.soMarked();
+        curr.increment(succ.size());
         curr.soNext(succ.lpNext());
 
     }
@@ -441,7 +453,8 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
         }
 
         succ.soMarked();
-
+        curr.increment(toMove);
+        node.increment(succSize - toMove);
         node.spNext(succ.lpNext());
         curr.soNext(node);
     }
@@ -470,7 +483,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
             }
         }
 
-        indices[1] = curr.size(arrayCap); //iterates the array
+        indices[1] = curr.size(); //iterates the array
     }
 
     static <T extends Comparable<T>> void nullifyIndex(int index, int arrayCap ,EliminationNode<T> curr) {

@@ -3,7 +3,9 @@ package io.github.kusoroadeolu.sl;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 //A lock free ordered linked singly linked list set
 // States - marked (linearization point for removal), null key (means the pred node has been logically fully deleted), next pointer marked as a tombstone (node is going to be unlinked, don't cas to it's next ptr)
@@ -104,7 +106,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
             var pred = l;
             var curr = pred.loNext();
 
-            while (true) {
+            for (;;) {
                 if (curr.isDummy())
                     continue restartFromLeft; //If we find a dummy node, restart from left
 

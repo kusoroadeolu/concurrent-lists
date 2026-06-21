@@ -38,11 +38,11 @@ import java.util.concurrent.locks.ReentrantLock;
 * This however is mitigated as reader threads traverse the array from the right ensuring no duplicate value is seen during traversals
 *
 *
-* To mitigate some complexity and keep the array as the single source of truth, we don't keep a cache of the size field,
-* however we traverse the array to take not of the size (this prevents the risk of off-by-one errors)
-* which are especially common when dealing with arrays
+* To mitigate some synchronization complexity, we use causal guarantees for the size field (i.e acquire/release modes)
 * */
-
+/**
+ * @author kusoroadeolu
+ * */
 @SuppressWarnings("unchecked")
 public class UnrolledConcurrentList<T extends Comparable<T>> implements ConcurrentCollection<T> {
     private final Node<T> left;
@@ -94,6 +94,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                 if (curr == r || t.compareTo(curr.anchor) < 0) {
                     Node<T> n = new Node<>(t, aCap);
                     n.soArray(0, t);
+                    n.increment(1);
                     n.spNext(curr);
                     pred.soNext(n);
                     return true;
@@ -110,18 +111,16 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
                 if (size < aCap) {
                     curr.soArray(idx, t); //Linearization point
+                    curr.increment(1);
                     return true;
                 } else { //Split
                     curr.lock(); //Lock to ensure no one can modify curr.next during the split
                     // So we have a consistent view of curr.next from when we start the split operation
                     try {
                         var succ = curr.lpNext();
-                        var arr = curr.array;
-                        split(arr, aCap ,t ,nodes);
+                        split(aCap ,t ,nodes);
                         var n1 = nodes[0];
                         var n2 = nodes[1];
-
-
                         curr.soMarked();
                         n1.spNext(n2);
                         n1.lock(); //Need this here for hb for plain reads of n1 next ptr
@@ -168,6 +167,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                 int size = indices[1];
                 if (index  == -1) return false;
                 nullifyIndex(index, aCap ,curr);
+                curr.decrement();
                 int currSize = size - 1;
 
                 if (currSize > minFull) return true;
@@ -175,8 +175,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                 try {
                     var succ = curr.lpNext();
                     if (currSize == 0) {
-                        curr.soMarked(); //Could we use a weaker mode for marked, maybe use the next write as a HB relationship. The issue though is
-                        //a thread has previously read prev and its next flag, it context switches, another thread adds and then marks
+                        curr.soMarked();
                         pred.soNext(succ);
                         return true;
                     }
@@ -185,7 +184,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
                     succ.lock(); //Ensure we lock succ to prevent other threads from making structural modifications to its array
                     try {
-                        int succSize = succ.size(aCap);
+                        int succSize = succ.size();
                         int total = currSize + succSize;
                         int[] emptyIndexes = new int[succSize];
                         findEmptyIndexes(emptyIndexes, aCap ,curr);
@@ -260,11 +259,10 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         return -1;
     }
 
-    static <T extends Comparable<T>>void split(Object[] array, int arrayCap ,T t ,Node<T>[] nodes) {
+    static <T extends Comparable<T>>void split(int arrayCap ,T t ,Node<T>[] nodes) {
         int len = arrayCap + 1;
-        Object[] copy = Arrays.copyOf(array, len); //Copy to prevent modifying the initial array
+        Object[] copy = Arrays.copyOf(nodes[1].array, len); //Copy to prevent modifying the initial array
         copy[arrayCap] = t;
-
 
         Arrays.sort(copy);
         Object[] arr1 = new Object[arrayCap];
@@ -274,8 +272,12 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         int rem = len - half;
         System.arraycopy(copy, 0, arr1, 0, half);
         System.arraycopy(copy, half, arr2, 0, rem);
-        nodes[0] = new Node<>(arr1);
-        nodes[1] = new Node<>(arr2);
+        var n1 = new Node<T>(arr1);
+        var n2 = new Node<T>(arr2);
+        n1.increment(half);
+        n2.increment(rem);
+        nodes[0] = n1;
+        nodes[1] = n2;
     }
 
     static int findNonNullIndex(Object[] arr, int arrayCap ,int index) {
@@ -297,7 +299,8 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         }
 
         succ.soMarked();
-        curr.soNext(succ.lpNext());
+        curr.increment(succ.size());
+        curr.soNext(succ.lpNext()); //Plain read for succ as we already hold its lock
 
     }
 
@@ -320,11 +323,22 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
             }
         }
 
-        succ.soMarked();
 
+        succ.soMarked();
+        curr.increment(toMove);
+        node.increment(succSize - toMove);
         node.spNext(succ.lpNext());
         curr.soNext(node);
     }
+
+    /* 5, 10 = 15
+     * Total = currSize + succSize
+     * toMove = 10 - 7 = 3
+     *
+     * node = 10 (items)
+     * currSize = 5 + 3;
+     *
+     * */
 
     static <T extends Comparable<T>> void nullifyIndex(int index, int arrayCap ,Node<T> curr) {
         var arr = curr.array;
@@ -433,7 +447,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
             }
         }
 
-        indices[1] = curr.size(arrayCap); //iterates the array
+        indices[1] = curr.size();
     }
 
 
@@ -442,6 +456,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         final T anchor;
         final Object[] array;
         final Lock lock;
+        int size;
         volatile boolean marked;
         volatile Node<T> next;
 
@@ -529,15 +544,24 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
             return anchor + " : " + Arrays.toString(array);
         }
 
-        int size(int arrayCap) {
-            int size = 0;
-            for (int i = 0; i < arrayCap; ++i) {
-                if (lpArray(i) != null) {
-                    ++size;
-                }
-            }
+        void increment(int by) {
+            SIZE.getAndAddRelease(this, by);
+        }
 
-            return size;
+        void decrement() {
+            SIZE.getAndAddRelease(this, -1);
+        }
+
+        int size() {
+           return (int) SIZE.getAcquire(this);
+        }
+
+        int iSize() {
+            int s = 0;
+            for (int i = 0; i < array.length; ++i) {
+                if (array[i] != null) ++s;
+            }
+            return s;
         }
 
     }
@@ -557,10 +581,11 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
     private static final VarHandle MARKED;
     private static final VarHandle NEXT;
     private static final VarHandle ARRAY;
+    private static final VarHandle SIZE;
 
     @Override
     public boolean isEmpty() {
-        return false;
+        return left.next == right;
     }
 
     @Override
@@ -617,6 +642,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         MethodHandles.Lookup l = MethodHandles.lookup();
         try {
             ARRAY = MethodHandles.arrayElementVarHandle(Object[].class);
+            SIZE = l.findVarHandle(Node.class, "size", int.class);
             MARKED = l.findVarHandle(Node.class, "marked", boolean.class);
             NEXT = l.findVarHandle(Node.class, "next", Node.class);
         } catch (Exception e) {

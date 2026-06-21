@@ -39,13 +39,23 @@ ListWriteHeavyBench.fourThreads   LAZY_COARSE  avgt   30   45.808 ±  1.560  us/
 
 //UNROLLED Variants
 /* ArraySize Per Node = 64
-Benchmark                           (type)   Mode  Cnt  Score   Error   Units
-ListWriteHeavyBench.eightThreads  UNROLLED  thrpt   30  3.871 ± 0.056  ops/us
-ListWriteHeavyBench.fourThreads   UNROLLED  thrpt   30  2.512 ± 0.043  ops/us
+Benchmark                                (type)   Mode  Cnt  Score   Error   Units
+ListWriteHeavyBench.eightThreads     LOCAL_ELIM  thrpt   30  2.317 ± 0.121  ops/us
+ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  thrpt   30  3.262 ± 0.266  ops/us
+ListWriteHeavyBench.eightThreads       UNROLLED  thrpt   30  4.228 ± 0.140  ops/us
+ListWriteHeavyBench.fourThreads      LOCAL_ELIM  thrpt   30  1.928 ± 0.107  ops/us
+ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  thrpt   30  2.707 ± 0.110  ops/us
+ListWriteHeavyBench.fourThreads        UNROLLED  thrpt   30  3.025 ± 0.081  ops/us
 
-Benchmark                           (type)  Mode  Cnt  Score   Error  Units
-ListWriteHeavyBench.eightThreads  UNROLLED  avgt   30  1.938 ± 0.032  us/op
-ListWriteHeavyBench.fourThreads   UNROLLED  avgt   30  1.194 ± 0.022  us/op
+
+
+Benchmark                                (type)  Mode  Cnt  Score   Error  Units
+ListWriteHeavyBench.eightThreads     LOCAL_ELIM  avgt   30  2.969 ± 0.153  us/op
+ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  avgt   30  2.191 ± 0.108  us/op
+ListWriteHeavyBench.eightThreads       UNROLLED  avgt   30  2.053 ± 0.086  us/op
+ListWriteHeavyBench.fourThreads      LOCAL_ELIM  avgt   30  1.697 ± 0.044  us/op
+ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  avgt   30  1.200 ± 0.027  us/op
+ListWriteHeavyBench.fourThreads        UNROLLED  avgt   30  1.224 ± 0.109  us/op
 * */
 
 /*
@@ -55,25 +65,7 @@ ListWriteHeavyBench.fourThreads   EF_UNROLLED  thrpt   30  0.038 ± 0.005  ops/u
 *
 * */
 
-/*
-* Benchmark                                (type)   Mode  Cnt  Score   Error   Units
-ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  thrpt   30  3.276 ± 0.177  ops/us
-ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  thrpt   30  2.983 ± 0.047  ops/us
-*
-* Benchmark                                (type)  Mode  Cnt  Score   Error  Units
-ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  avgt   30  2.361 ± 0.153  us/op
-ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  avgt   30  1.369 ± 0.054  us/op
-* */
 
-/*
-* Benchmark                                (type)  Mode  Cnt  Score   Error  Units
-* ListWriteHeavyBench.eightThreads  LOCAL_ELIM  thrpt   30  2.303 ± 0.171  ops/us
-ListWriteHeavyBench.fourThreads   LOCAL_ELIM  thrpt   30  2.073 ± 0.087  ops/us
-*
-* Benchmark                             (type)  Mode  Cnt  Score   Error  Units
-ListWriteHeavyBench.eightThreads  LOCAL_ELIM  avgt   30  3.091 ± 0.077  us/op
-ListWriteHeavyBench.fourThreads   LOCAL_ELIM  avgt   30  1.871 ± 0.078  us/op
-* */
 
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -84,7 +76,7 @@ ListWriteHeavyBench.fourThreads   LOCAL_ELIM  avgt   30  1.871 ± 0.078  us/op
 public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     private ConcurrentCollection<Integer> set;
 
-    @Param({/*"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED", "ELIM_UNROLLED",*/ "LOCAL_ELIM"})
+    @Param({/*"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED", "ELIM_UNROLLED",*/ "LOCAL_ELIM", "ELIM_UNROLLED", "UNROLLED"})
     private String type;
 
     @Setup

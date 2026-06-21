@@ -2,7 +2,8 @@ package io.github.kusoroadeolu.sl;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicIntegerArray;
@@ -24,6 +25,9 @@ import static io.github.kusoroadeolu.sl.EFUnrolledConcurrentList.Status.*;
  * This is pretty much experimental, and the results are really not that great due to all the
  * overhead of retrying if a node is deleted and the overhead of verifying i
  *  */
+/**
+ * @author kusoroadeolu
+ * */
 public class EFUnrolledConcurrentList<T extends Comparable<T>>  implements ConcurrentCollection<T> {
 
     private final AtomicIntegerArray arena;

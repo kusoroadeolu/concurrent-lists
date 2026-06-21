@@ -3,7 +3,6 @@ package io.github.kusoroadeolu.sl;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 
 public interface ConcurrentCollection<T> extends Collection<T> {
     boolean add(T t);

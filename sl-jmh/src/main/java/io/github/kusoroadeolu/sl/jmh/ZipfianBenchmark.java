@@ -1,5 +1,6 @@
 package io.github.kusoroadeolu.sl.jmh;
 
+import io.github.kusoroadeolu.sl.ConcurrentCollection;
 import io.github.kusoroadeolu.sl.EliminationMetrics;
 import io.github.kusoroadeolu.sl.EliminationUnrolledConcurrentList;
 import org.openjdk.jmh.annotations.*;
@@ -32,7 +33,8 @@ ZipfianBenchmark.fullWrite:arenaSuccesses             128  ELIM_UNROLLED  thrpt 
 ZipfianBenchmark.fullWrite:nodeSuccesses              128  ELIM_UNROLLED  thrpt   30  0.931 ± 0.157  ops/us
 ZipfianBenchmark.fullWrite                            256  ELIM_UNROLLED  thrpt   30  2.363 ± 0.475  ops/us
 ZipfianBenchmark.fullWrite:arenaSuccesses             256  ELIM_UNROLLED  thrpt   30  0.911 ± 0.191  ops/us
-ZipfianBenchmark.fullWrite:nodeSuccesses              256  ELIM_UNROLLED  thrpt   30  0.999 ± 0.189  ops/us */
+ZipfianBenchmark.fullWrite:nodeSuccesses              256  ELIM_UNROLLED  thrpt   30  0.999 ± 0.189  ops/us
+*/
 
 /*
 * so i did some profiling(for the suspicious results) and its pretty surprising.
@@ -53,6 +55,27 @@ ZipfianBenchmark.fullWrite:nodeSuccesses              256  ELIM_UNROLLED  thrpt 
 * While this didnt fully get rid of the issue(as the high err margins in some results) it increased the number of successful eliminations in the arena to an almost 1:1 ratio with the node successes
 * and reduced the amount of times this happened throughout the benchmark
 * */
+
+
+/* After
+Benchmark                                  (keySpaceSize)         (type)   Mode  Cnt  Score   Error   Units
+ZipfianBenchmark.fullWrite                             64  ELIM_UNROLLED  thrpt   30  4.381 ± 0.143  ops/us
+ZipfianBenchmark.fullWrite:arenaSuccesses              64  ELIM_UNROLLED  thrpt   30  1.461 ± 0.063  ops/us
+ZipfianBenchmark.fullWrite:nodeSuccesses               64  ELIM_UNROLLED  thrpt   30  1.997 ± 0.063  ops/us
+ZipfianBenchmark.fullWrite                            128  ELIM_UNROLLED  thrpt   30  4.229 ± 0.124  ops/us
+ZipfianBenchmark.fullWrite:arenaSuccesses             128  ELIM_UNROLLED  thrpt   30  1.454 ± 0.044  ops/us
+ZipfianBenchmark.fullWrite:nodeSuccesses              128  ELIM_UNROLLED  thrpt   30  1.893 ± 0.058  ops/us
+ZipfianBenchmark.fullWrite                            256  ELIM_UNROLLED  thrpt   30  3.938 ± 0.361  ops/us
+ZipfianBenchmark.fullWrite:arenaSuccesses             256  ELIM_UNROLLED  thrpt   30  1.172 ± 0.276  ops/us
+ZipfianBenchmark.fullWrite:nodeSuccesses              256  ELIM_UNROLLED  thrpt   30  1.950 ± 0.057  ops/us
+* */
+
+/*
+* Benchmark                   (keySpaceSize)         (type)   Mode  Cnt  Score   Error   Units
+ZipfianBenchmark.fullWrite              64  UNROLLED  thrpt   30  2.055 ± 0.177  ops/us
+ZipfianBenchmark.fullWrite             128  UNROLLED  thrpt   30  1.726 ± 0.056  ops/us
+ZipfianBenchmark.fullWrite             256  UNROLLED  thrpt   30  1.863 ± 0.163  ops/us
+* */
 public class ZipfianBenchmark {
 
     @Param({"64", "128", "256"})
@@ -65,7 +88,7 @@ public class ZipfianBenchmark {
     private ZipfianGenerator zipf;
 
     @State(Scope.Thread)
-    @AuxCounters(AuxCounters.Type.OPERATIONS)
+   @AuxCounters(AuxCounters.Type.OPERATIONS)
     public static class ThreadState {
         SplittableRandom rng;
         public int nodeSuccesses;
@@ -106,10 +129,10 @@ public class ZipfianBenchmark {
     }
 
 
-//    @Benchmark
-//    public void eightyWriteTwentyRead(ThreadState ts, Blackhole bh) {
-//        op(set, ts, bh);
-//    }
+    @Benchmark
+    public void eightyWriteTwentyRead(ThreadState ts, Blackhole bh) {
+        op(set, ts, bh);
+    }
 
     @Benchmark
     public void fullWrite(ThreadState ts, Blackhole bh) {
@@ -117,7 +140,7 @@ public class ZipfianBenchmark {
     }
 
 
-    private void op(EliminationUnrolledConcurrentList<Integer> set, ThreadState ts, Blackhole bh) {
+    private void op(ConcurrentCollection<Integer> set, ThreadState ts, Blackhole bh) {
         int key = zipf.nextInt(ts.rng);
         if (ts.rng.nextDouble() < 0.80) {
             if (ts.rng.nextBoolean()) bh.consume(set.add(key));
@@ -127,7 +150,7 @@ public class ZipfianBenchmark {
         }
     }
 
-    private void fullWrite(EliminationUnrolledConcurrentList<Integer> set, ThreadState ts, Blackhole bh) {
+    private void fullWrite(ConcurrentCollection<Integer> set, ThreadState ts, Blackhole bh) {
         int key = zipf.nextInt(ts.rng);
         if (ts.rng.nextDouble(1) < 0.5) bh.consume(set.add(key));
         else bh.consume(set.remove(key));

@@ -4,6 +4,7 @@ import org.openjdk.jcstress.annotations.*;
 import org.openjdk.jcstress.infra.results.II_Result;
 
 import java.lang.invoke.VarHandle;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -57,8 +58,8 @@ public class MiscStress {
         }
     }
 
-    @JCStressTest()
-    @Outcome(id = {"1, 1", "1, 0", "0, 0"}, expect = ACCEPTABLE, desc = "Acceptable")
+    @JCStressTest
+    @Outcome(id = {"1, 1", "0, 1", "0, 0"}, expect = ACCEPTABLE, desc = "Acceptable")
     @State
     public static class RAFenceStress {
         int a = 0;
@@ -67,7 +68,6 @@ public class MiscStress {
 
         @Actor
         public void writer() {
-            VarHandle.releaseFence();
             a = 1;
             VarHandle.releaseFence();
             b = 1;
@@ -77,7 +77,6 @@ public class MiscStress {
         //Invalid a = 0, b = 1;
         @Actor
         public void reader(II_Result r) {
-            VarHandle.acquireFence();
             r.r1 = a;
             r.r2 = b;
         }

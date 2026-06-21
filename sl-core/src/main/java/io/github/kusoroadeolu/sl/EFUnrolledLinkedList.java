@@ -60,7 +60,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
 
                 List<ThreadNode<T>> validNodes = filterValidNodes(tn, curr ,localValues);
                 int tnSize = validNodes.size();
-                int size = curr.size(aCap);
+                int size = curr.iSize();
                 int newSize = size + tnSize;
 
                 if (newSize <= aCap) {
@@ -137,10 +137,10 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
         nodes[0] = new Node<>(arr1);
         nodes[1] = new Node<>(arr2);
 
-       // assert nodes[0].anchor.compareTo(pred.anchor) > 0 &&  nodes[1].anchor.compareTo(pred.anchor) > 0;
+        // assert nodes[0].anchor.compareTo(pred.anchor) > 0 &&  nodes[1].anchor.compareTo(pred.anchor) > 0;
     }
 
-     boolean remove(ThreadNode<T> tn, EFUnrolledConcurrentList.LocalValues<T> localValues) {
+    boolean remove(ThreadNode<T> tn, EFUnrolledConcurrentList.LocalValues<T> localValues) {
         UnrolledConcurrentList.Node<T> l = left;
         UnrolledConcurrentList.Node<T> r = right;
         int aCap = arrayCap;
@@ -168,7 +168,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
             try {
                 if (isNotValid(pred, curr)) return false;
 
-                int size = curr.size(aCap);
+                int size = curr.iSize();
 
                 int removeCount = removePresentValues(tn, localValues ,curr, aCap);
                 int currSize = size - removeCount;
@@ -188,7 +188,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
 
                     succ.lock(); //Ensure we lock succ to prevent other threads from making structural modifications to its array
                     try {
-                        int succSize = succ.size(aCap);
+                        int succSize = succ.iSize();
                         int total = currSize + succSize;
                         int[] emptyIndexes = new int[succSize];
                         findEmptyIndexes(emptyIndexes, aCap ,curr);
@@ -302,6 +302,45 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
     Node<T> currNode(ThreadNode<T> t, EFUnrolledConcurrentList.LocalValues<T> localValues) {
         findNode(t.value, left, right, localValues.nodes());
         return localValues.nodes()[1];
+    }
+
+    static <T extends Comparable<T>>void merge(Node<T> curr, Node<T> succ, int arrayCap ,int[] indexes) {
+        for (int i = 0, j = 0; i < arrayCap; ++i) {
+            T t = succ.lpArray(i);
+            if (t != null) {
+                var idx = indexes[j++];
+                curr.soArray(idx, t);
+
+            }
+        }
+
+        succ.soMarked();
+        curr.soNext(succ.lpNext()); //Plain read for succ as we already hold its lock
+
+    }
+
+    static <T extends Comparable<T>>void redistribute(Node<T> curr, Node<T> succ, int succSize, int arrayCap ,int total) {
+        Object[] copy = Arrays.stream(succ.array.clone())
+                .filter(Objects::nonNull)
+                .toArray();
+
+        int nodeCount = total / 2;
+        int toMove = succSize - nodeCount;
+        Arrays.sort(copy);
+        var nodeArr = Arrays.copyOf(copy, arrayCap);
+        var node = new Node<>((T) nodeArr[toMove], nodeArr);
+        for (int i = 0, j = 0; i < arrayCap; ++i) {
+            if (j == toMove) break;
+            if (curr.lpArray(i) == null) {
+                curr.soArray(i, (T) nodeArr[j]);
+                nodeArr[j++] = null;
+            }
+        }
+
+
+        succ.soMarked();
+        node.spNext(succ.lpNext());
+        curr.soNext(node);
     }
 
     public List<T> anchorList() {
