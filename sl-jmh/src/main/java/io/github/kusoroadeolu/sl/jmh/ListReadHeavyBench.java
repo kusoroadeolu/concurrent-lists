@@ -68,7 +68,6 @@ public class ListReadHeavyBench {
             case "LAZY_COARSE" -> new LazyCoarseSyncList<>();
             case "LOCK" -> new LockedOrderedLL<>();
             case "EF_UNROLLED" -> new EFUnrolledConcurrentList<>();
-
             default -> throw new IllegalArgumentException();
         };
 
