@@ -149,7 +149,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
             } else {
                 if (d == null) d = new Node<>(null, true);
                 d.spNext(n);
-                if (d.casNext(n, d)) break;
+                if (curr.casNext(n, d)) break; //Swap curr's next to a dummy node
             }
         }
 
