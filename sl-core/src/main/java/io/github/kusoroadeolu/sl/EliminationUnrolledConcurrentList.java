@@ -95,7 +95,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
             var pred = nodes[0];
             var curr = nodes[1];
 
-            if (pred.loMarked() || curr.loMarked()) continue;
+            if (pred.lvMarked() || curr.lvMarked()) continue;
 
             if (pred.tryLock()) {
                 try {
@@ -134,7 +134,8 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
                             var n2 = nodes[1];
 
 
-                            curr.soMarked();
+                            curr.svMarked();
+
                             n1.spNext(n2);
                             n2.spNext(succ);
                             pred.soNext(n1); //Linearization point
@@ -183,7 +184,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
             }
             var pred = nodes[0];
             EliminationNode<T> curr =  nodes[1];
-            if (pred.loMarked() || curr.loMarked()) continue;
+            if (pred.lvMarked() || curr.lvMarked()) continue;
 
             if (pred.tryLock()) {
                 try {
@@ -209,7 +210,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
                     try {
                         var succ = curr.lpNext();
                         if (currSize == 0) {
-                            curr.soMarked(); //Could we use a weaker mode for marked, maybe use the next write as a HB relationship. The issue though is
+                            curr.svMarked(); //Could we use a weaker mode for marked, maybe use the next write as a HB relationship. The issue though is
                             //a thread has previously read prev and its next flag, it context switches, another thread adds and then marks
                             pred.soNext(succ);
                             return true;
@@ -348,7 +349,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
         do {
             findNode(t, l, r ,nodes);
             curr = nodes[1];
-        } while (curr.loMarked());
+        } while (curr.lvMarked());
 
         if (curr == r || curr.anchor.compareTo(t) > 0) return false;
 
@@ -388,7 +389,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
         findNode(t, left, right, nodes);
         var curr = nodes[1];
 
-        if (curr == right || curr.loMarked() || curr.anchor.compareTo(t) > 0) return false;
+        if (curr == right || curr.lvMarked() || curr.anchor.compareTo(t) > 0) return false;
 
         for (int i = arrayCap - 1; i >= 0; --i) {
             T v = curr.loArray(i);
@@ -422,7 +423,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
             }
         }
 
-        succ.soMarked();
+        succ.svMarked();
         curr.increment(succ.size());
         curr.soNext(succ.lpNext());
 
@@ -447,7 +448,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
             }
         }
 
-        succ.soMarked();
+        succ.svMarked();
         curr.increment(toMove);
         node.increment(succSize - toMove);
         node.spNext(succ.lpNext());

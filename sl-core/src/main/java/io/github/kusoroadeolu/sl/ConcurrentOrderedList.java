@@ -76,9 +76,8 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
                 else {
                     //Ensure we immediately set curr = next; backed by volatile write
                     node.spNext(curr);
-                    if (pred.casNext(curr, node)) { //Linearization point
-                        return true;
-                    }
+                    if (pred.casNext(curr, node)) return true; //Linearization point
+
                     //Move backwards, don't change pred, two things could've happened, pred was deleted (its dummy tombstone was introduced) or a new node greater than pred was added
 
                     //Here we could rather just move to next rather than checking if pred is marked
@@ -243,7 +242,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
         }
 
         public boolean isMarked(){
-            return (boolean) MARKED.getAcquire(this);
+            return (boolean) MARKED.getVolatile(this);
         }
 
         public void spNext(Node<T> next) {

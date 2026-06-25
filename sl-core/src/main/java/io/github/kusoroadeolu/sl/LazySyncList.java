@@ -105,7 +105,7 @@ public class LazySyncList<T extends Comparable<T>> implements ConcurrentCollecti
                     curr.lock();
                     if (curr.lpMarked()) return false;
 
-                    pred.soNext(curr.lpNext()); //Order here matters, we need to ensure node#next is set before we link pred to node
+                    pred.soNext(curr.lpNext());
                     curr.soMarked();
                     return true;
                 }finally {

@@ -38,7 +38,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
         var pred = nodes[0];
         var curr = nodes[1];
 
-        if ((tn.node != null && curr != tn.node) || pred.loMarked() || curr.loMarked()) {
+        if ((tn.node != null && curr != tn.node) || pred.lvMarked() || curr.lvMarked()) {
             tn.markAllRetry();
         }
 
@@ -84,7 +84,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
                         var n1 = nodes[0];
                         var n2 = nodes[1];
 
-                        curr.soMarked();
+                        curr.svMarked();
                         n1.spNext(n2);
                         n2.spNext(succ);
                         pred.soNext(n1); //Linearization point
@@ -143,7 +143,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
         var pred = nodes[0];
         var curr = nodes[1];
 
-        if ((tn.node != null && curr != tn.node) || pred.loMarked() || curr.loMarked()) {
+        if ((tn.node != null && curr != tn.node) || pred.lvMarked() || curr.lvMarked()) {
             tn.markAllRetry();
         }
 
@@ -172,7 +172,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
                 try {
                     var succ = curr.lpNext();
                     if (currSize == 0) {
-                        curr.soMarked(); //Could we use a weaker mode for marked, maybe use the next write as a HB relationship. The issue though is
+                        curr.svMarked(); //Could we use a weaker mode for marked, maybe use the next write as a HB relationship. The issue though is
                         //a thread has previously read prev and its next flag, it context switches, another thread adds and then marks
                         pred.soNext(succ);
                         return true;
@@ -237,7 +237,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
         do {
             findNode(t, l, r ,nodes);
             curr = nodes[1];
-        } while (curr.loMarked());
+        } while (curr.lvMarked());
 
         if (curr == r || curr.anchor.compareTo(t) > 0) return false;
 
@@ -308,7 +308,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
             }
         }
 
-        succ.soMarked();
+        succ.svMarked();
         curr.soNext(succ.lpNext()); //Plain read for succ as we already hold its lock
 
     }
@@ -332,7 +332,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
         }
 
 
-        succ.soMarked();
+        succ.svMarked();
         node.spNext(succ.lpNext());
         curr.soNext(node);
     }

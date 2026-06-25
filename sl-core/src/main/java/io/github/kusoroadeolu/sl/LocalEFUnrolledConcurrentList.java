@@ -117,7 +117,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
                             var n1 = nodes[0];
                             var n2 = nodes[1];
 
-                            curr.soMarked();
+                            curr.svMarked();
                             n1.spNext(n2);
                             n2.spNext(succ);
                             pred.soNext(n1); //Linearization point, makes n1 and n2 visible
@@ -191,7 +191,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
                     try {
                         var succ = curr.lpNext();
                         if (currSize == 0) {
-                            curr.soMarked();
+                            curr.svMarked();
                             pred.soNext(succ);
                             return true;
                         }
@@ -368,7 +368,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
             }
         }
 
-        succ.soMarked();
+        succ.svMarked();
         curr.increment(succ.size());
         curr.soNext(succ.lpNext());
 
@@ -412,7 +412,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
         do {
             findNode(t, l, r ,nodes);
             curr = nodes[1];
-        } while (curr.loMarked());
+        } while (curr.lvMarked());
 
         if (curr == r || curr.anchor.compareTo(t) > 0) return false;
 
@@ -510,7 +510,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
             }
         }
 
-        succ.soMarked();
+        succ.svMarked();
         curr.increment(toMove);
         node.increment(succSize - toMove);
         node.spNext(succ.lpNext());
@@ -642,7 +642,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
             return (LocalEFNode<T>) NEXT.get(this);
         }
 
-        boolean loMarked(){
+        boolean lvMarked(){
             return (boolean) MARKED.getAcquire(this);
         }
 
@@ -650,7 +650,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
             return (boolean) MARKED.get(this);
         }
 
-        void soMarked(){
+        void svMarked(){
             MARKED.setRelease(this, true);
         }
 
@@ -720,7 +720,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
         }
     }
 
-    public static <T extends Comparable<T>> CombiningRequest<T> free() {
+    static <T extends Comparable<T>> CombiningRequest<T> free() {
         return  (CombiningRequest<T>) FREE;
     }
 

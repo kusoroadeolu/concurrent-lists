@@ -86,7 +86,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
             var pred = nodes[0];
             var curr = nodes[1];
 
-           if (pred.loMarked() || curr.loMarked()) continue;
+           if (pred.lvMarked() || curr.lvMarked()) continue;
 
            pred.lock();
             try {
@@ -122,7 +122,8 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                         split(aCap ,t ,nodes);
                         var n1 = nodes[0];
                         var n2 = nodes[1];
-                        curr.soMarked();
+
+                        curr.svMarked(); //Prevent reorderings upward
 
                         n1.spNext(n2);
                         n2.spNext(succ);
@@ -155,7 +156,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
             var pred = nodes[0];
             var curr = nodes[1];
 
-            if (pred.loMarked() || curr.loMarked()) continue;
+            if (pred.lvMarked() || curr.lvMarked()) continue; //At this point, next we can be sure next writes haven't
 
             pred.lock();
             try {
@@ -173,7 +174,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                 try {
                     var succ = curr.lpNext();
                     if (currSize == 0) {
-                        curr.soMarked();
+                        curr.svMarked();
                         pred.soNext(succ);
                         return true;
                     }
@@ -222,7 +223,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         do {
             findNode(t, l, r ,nodes);
             curr = nodes[1];
-        } while (curr.loMarked());
+        } while (curr.lvMarked());
 
         if (curr == r || curr.anchor.compareTo(t) > 0) return false;
 
@@ -296,7 +297,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
             }
         }
 
-        succ.soMarked();
+        succ.svMarked();
         curr.increment(succ.size());
         curr.soNext(succ.lpNext()); //Plain read for succ as we already hold its lock
 
@@ -322,9 +323,11 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         }
 
 
-        succ.soMarked();
+        succ.svMarked();
+
         curr.increment(toMove);
         node.increment(succSize - toMove);
+
         node.spNext(succ.lpNext());
         curr.soNext(node);
     }
@@ -404,7 +407,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         findNode(t, left, right, nodes);
         var curr = nodes[1];
 
-        if (curr == right || curr.loMarked() || curr.anchor.compareTo(t) > 0) return false;
+        if (curr == right || curr.lvMarked() || curr.anchor.compareTo(t) > 0) return false;
 
         for (int i = arrayCap - 1; i >= 0; --i) {
             T v = curr.loArray(i);
@@ -513,16 +516,16 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
             return (Node<T>) NEXT.get(this);
         }
 
-        boolean loMarked(){
-            return (boolean) MARKED.getAcquire(this);
+        boolean lvMarked(){
+            return (boolean) MARKED.getVolatile(this);
         }
 
         boolean lpMarked(){
             return (boolean) MARKED.get(this);
         }
 
-        void soMarked(){
-            MARKED.setRelease(this, true);
+        void svMarked(){
+            MARKED.setVolatile(this, true);
         }
 
         public Node<T> loNext() {

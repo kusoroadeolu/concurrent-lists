@@ -86,16 +86,16 @@ public class EliminationNode<T extends Comparable<T>> {
         return (EliminationNode<T>) NEXT.get(this);
     }
 
-    boolean loMarked(){
-        return (boolean) MARKED.getAcquire(this);
+    boolean lvMarked(){
+        return (boolean) MARKED.getVolatile(this);
     }
 
     boolean lpMarked(){
         return (boolean) MARKED.get(this);
     }
 
-    void soMarked(){
-        MARKED.setRelease(this, true);
+    void svMarked(){
+        MARKED.setVolatile(this, true);
     }
 
     public EliminationNode<T> loNext() {

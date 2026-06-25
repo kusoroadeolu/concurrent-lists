@@ -5,6 +5,7 @@ import org.openjdk.jcstress.infra.results.I_Result;
 import org.openjdk.jcstress.infra.results.Z_Result;
 
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.IntStream;
 
 import static org.openjdk.jcstress.annotations.Expect.ACCEPTABLE;
@@ -150,6 +151,48 @@ public class ListStress {
         @Arbiter
         public void arbiter(Z_Result r) {
             List<Integer> ls = list.toList();
+
+            r.r1 = IntStream.range(0, ls.size() - 1)
+                    .allMatch(i -> ls.get(i) <= ls.get(i + 1));
+        }
+    }
+
+
+    @JCStressTest
+    @Outcome(id = "true", expect = ACCEPTABLE, desc = "List is sorted")
+    @Outcome(id = "false", expect = Expect.FORBIDDEN, desc = "List is unsorted")
+    @State
+    public static class ConcurrentOrderedRandomListStress {
+
+        private ConcurrentOrderedList<Integer> set = new ConcurrentOrderedList<>();
+
+        @Actor
+        public void actor1() {
+            doWork();
+        }
+
+        @Actor
+        public void actor2() {
+            doWork();
+        }
+
+        @Actor
+        public void actor3() {
+            doWork();
+        }
+
+        void doWork() {
+            for (int i = 0; i <= 5; ++i) {
+                boolean add = ThreadLocalRandom.current().nextInt() % 2 == 0;
+                if (add) {
+                    set.add(ThreadLocalRandom.current().nextInt(20));
+                }else set.remove(ThreadLocalRandom.current().nextInt(20));
+            }
+        }
+
+        @Arbiter
+        public void arbiter(Z_Result r) {
+            List<Integer> ls = set.toList();
 
             r.r1 = IntStream.range(0, ls.size() - 1)
                     .allMatch(i -> ls.get(i) <= ls.get(i + 1));
