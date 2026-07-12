@@ -7,25 +7,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-//A lock free ordered linked singly linked list set
-// States - marked (linearization point for removal), null key (means the pred node has been logically fully deleted), next pointer marked as a tombstone (node is going to be unlinked, don't cas to it's next ptr)
-// The next node ideas were borrowed from fraser's thesis and the JDK Skip list map
+/*
+A lock free ordered linked singly linked list set
+States - marked (linearization point for removal), null key (means the pred node has been logically fully deleted), next pointer marked as a tombstone (node is going to be unlinked, don't cas to it's next ptr)
+The next node ideas were borrowed from fraser's thesis and the JDK Skip list map
 
-// ADD
-// A node can be said to be inserted when it successfully when it successfully performs a CAS on a node whose value is less than it,
-// if a node's value is equal to t and the node is not marked as deleted, we return false
-// On cas failure, a thread retries either moving its next pointer to the new next variable or checking if its predecessor has been deleted
-// If its predecessor has been deleted, we retry from the left of the list (which is pretty expensive, but we cant move backwards in this list)
+The 2 main ideas here are helping and ownership checks for a node's next pointer using a cas
+The main issue during physical unlinking is the issue of lost writes; mid deletion, a thread could insert a node, to a deleted node's next pointer
+To solve this, we could approach this using stamped nodes through atomic stamped reference, to ensure a cas to a node's next pointer fails if a thread marks the stamp of the bit
 
-// During traversal if our curr node is marked as deleted, we mark it as ready to be unlinked and then try to link our pred to the closest alive node
+However, this incurs high memory overhead when the workload is insert heavy(as we keep unneeded bits for nodes at rest), plus the api of atomic stamped ref is pretty annoying to use
 
-// DELETES
-// A node can be said to be deleted if we find an unmarked node equal to T, and we successfully CAS it to be marked
-// If we don't succeed the cas we retry as another thread could've added a new unmarked node, returning false if we fail to find a new node
-// We then try to cas pred.next to the next, if we fail, we continue from outer and try to help other threads going through deletion
-// During helping we ensure pred is always on an unmarked node while moving curr to the closest unmarked node from curr,
-// if pred is ever marked, we restart from left
-// We exit the loop when curr.t > t
+To solve this, during deletions, we instead use a tombstone based approach in which during deletions, a thread cas's a dummy node to the next ref of a node, any thread that tries to cas to
+that node's next ref, will see the dummy tombstone and instead backoff
+
+This also allows for helping, a thread which encounters a deleted node, can help attach its tombstone and unlink it
+*/
 
 /**
  * @author kusoroadeolu
@@ -58,21 +55,22 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
         var l = left;
         var r = right;
         var node = new Node<>(t);
-        restartFromLeft: for (; ;) {
+        restartFromLeft: for (;;) {
             var pred = l;
             var curr = pred.loNext();
             for (;;) {
                 if (curr.isDummy()) continue restartFromLeft; // We need to restart from left, here, we could keep traversing forward ideally, if pred < t
 
                 if (curr.isMarked()) { //If curr is marked try to help unlink
+                    //Ensure a volatile read, hb guarantee that marking happens before physical deletion of a node
                     curr = helpUnlink(pred, curr); //Only shift curr
                     continue;
                 }
 
-                int res;
-                if ((res = compare(t, curr, l, r)) == 0) return false;
+                int res = compare(t, curr, l, r);
 
-                if (res > 0) pred = curr;
+                if (res == 0) return false;
+                else if (res > 0) pred = curr;
                 else {
                     //Ensure we immediately set curr = next; backed by volatile write
                     node.spNext(curr);
@@ -82,11 +80,9 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
 
                     //Here we could rather just move to next rather than checking if pred is marked
                     //If pred is marked, worst case scenario is that pred's tombstone has been inserted, and we have to restart from left on the next loop iteration
-
                 }
 
                 curr = pred.loNext();
-
             }
         }
 
@@ -94,7 +90,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
 
     //We iterate until we find t keeping track of pred, curr vars
     // If we reach value where curr = null, we restart from head
-    //Otherwise, if curr == v, we try cas, if we fail the cas, we retry as another thread could've added an equal at that time
+    //Otherwise, if curr == v, we try cas, if we fail the cas, we retry as another thread could've added the same value that time
     public boolean remove(Object o) {
         T t = (T) o;
         Objects.requireNonNull(t);
@@ -106,31 +102,31 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
             var curr = pred.loNext();
 
             for (;;) {
-                if (curr.isDummy())
+                if (curr.isDummy()) {
                     continue restartFromLeft; //If we find a dummy node, restart from left
+                }
 
                 if (curr.isMarked()) {
                     curr = helpUnlink(pred, curr);
                     continue;
                 }
 
+                /*
+                * Both 'dummy' and 'marked' reads are ordered by loNext write
+                * */
+
                 int res;
                 if ((res = compare(t, curr, l, r)) < 0) return false;
 
                 if (res == 0) {
-                    if (curr.casMarked()) {
-                        helpUnlink(pred, curr);
-                        return true;
-                    } else continue restartFromLeft; //We restart from left
+                    boolean marked = curr.casMarked();
+                    helpUnlink(pred, curr);
+                    return marked;
                 }
-
 
 
                 pred = curr; curr = pred.loNext();
             }
-
-            // A(pred) - B(marked) - C(dummy) - R
-            // A(pred) - R (curr)
 
         }
     }
@@ -138,19 +134,27 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
 
     //Returns the next undead node
     Node<T> helpUnlink(Node<T> pred, Node<T> curr) {
-        Node<T> n;
+        Node<T> n = curr.loNext();
         Node<T> d = null;
 
         for (;;) {
-            n = curr.loNext();
             if (n.isDummy()) {
                 n = n.loNext();
                 break;
             } else {
+
                 if (d == null) d = new Node<>(null, true);
                 d.spNext(n);
                 if (curr.casNext(n, d)) break; //Swap curr's next to a dummy node
+                //Volatile write
+
+                /*
+                * On pred.loNext() reads in add/remove, it ensures dummy/marked reads cannot be reordered past the "next" acquire read
+                * and ensures
+                * */
             }
+
+            n = curr.loNext();
         }
 
         pred.casNext(curr, n); //try to link. failure is alright, another node has unlinked this , all we need is the new unmarked (at this point) curr node
@@ -199,9 +203,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
         var curr = l.loNext();
         //If we've reached the end of the list
         while (curr != r) {
-            if (!curr.isMarked()) {
-                ls.add(curr.t);
-            }
+            if (!curr.isMarked()) ls.add(curr.t);
             curr = curr.loNext();
         }
 
@@ -242,7 +244,7 @@ public class ConcurrentOrderedList<T extends Comparable<T>> implements Concurren
         }
 
         public boolean isMarked(){
-            return (boolean) MARKED.getVolatile(this);
+            return (boolean) MARKED.getAcquire(this);
         }
 
         public void spNext(Node<T> next) {

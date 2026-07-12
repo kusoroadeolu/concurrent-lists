@@ -48,7 +48,9 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
     private final Node<T> left;
     private final Node<T> right;
     private final ThreadLocal<LocalArrays<T>> localArrays;
-    private final int arrayCap;
+
+    //Capacity of each array per node
+    private final int capacity;
     private final int minFull;
     private final int maxMerge;
 
@@ -56,7 +58,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         this(64, 16);
     }
 
-    public UnrolledConcurrentList(int arrCap, int minFull) {
+    public UnrolledConcurrentList(int capacity, int minFull) {
         this.left = new SentinelNode<>();
         this.right = new SentinelNode<>();
         left.lock();
@@ -68,8 +70,8 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
         localArrays = ThreadLocal.withInitial(LocalArrays::new);
         this.minFull = minFull;
-        this.arrayCap = arrCap;
-        maxMerge = (int) (0.75 * arrCap);
+        this.capacity = capacity;
+        maxMerge = (int) (0.75 * capacity);
     }
 
 
@@ -77,7 +79,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         Objects.requireNonNull(t);
         Node<T> l = left;
         Node<T> r = right;
-        int aCap = arrayCap;
+        int aCap = capacity;
         var localArrays = this.localArrays.get();
         var nodes = localArrays.nodes();
         var indices = localArrays.indices(); //Stores exists in array index and size respectively
@@ -138,7 +140,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
             }finally {
                 pred.unlock();
                 nodes[0] = null;
-                nodes[1] = null;
+                nodes[1] = null; //avoid holding refs
             }
         }
     }
@@ -147,7 +149,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         T t = (T) Objects.requireNonNull(o);
         Node<T> l = left;
         Node<T> r = right;
-        int aCap = arrayCap;
+        int aCap = capacity;
         var localArrays = this.localArrays.get();
         var nodes = localArrays.nodes();
         var indices = localArrays.indices();
@@ -227,7 +229,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
         if (curr == r || curr.anchor.compareTo(t) > 0) return false;
 
-        for (int i = arrayCap - 1; i >= 0; --i) {
+        for (int i = capacity - 1; i >= 0; --i) {
             T v = curr.loArray(i);
             if (v != null && t.compareTo(v) == 0) return true;
         }
@@ -298,6 +300,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         }
 
         succ.svMarked();
+
         curr.increment(succ.size());
         curr.soNext(succ.lpNext()); //Plain read for succ as we already hold its lock
 
@@ -602,7 +605,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         List<T> ls = new ArrayList<>();
         while (curr != r) {
             var arr = curr.array.clone();
-            for (int i = 0; i < arrayCap; ++i) {
+            for (int i = 0; i < capacity; ++i) {
                 T t = (T) arr[i];
                 if (t != null) ls.add(t);
             }

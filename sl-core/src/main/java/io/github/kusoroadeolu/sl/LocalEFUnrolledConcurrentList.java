@@ -369,6 +369,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
         }
 
         succ.svMarked();
+
         curr.increment(succ.size());
         curr.soNext(succ.lpNext());
 

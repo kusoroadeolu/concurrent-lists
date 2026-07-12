@@ -185,7 +185,7 @@ public class ListStress {
             for (int i = 0; i <= 5; ++i) {
                 boolean add = ThreadLocalRandom.current().nextInt() % 2 == 0;
                 if (add) {
-                    set.add(ThreadLocalRandom.current().nextInt(20));
+                    set.add(ThreadLocalRandom.current().nextInt(30));
                 }else set.remove(ThreadLocalRandom.current().nextInt(20));
             }
         }

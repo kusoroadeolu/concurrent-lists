@@ -62,10 +62,11 @@ ListWriteHeavyBench.fourThreads        UNROLLED  avgt   30  1.224 ± 0.109  us/o
 Benchmark                              (type)   Mode  Cnt  Score   Error   Units
 ListWriteHeavyBench.eightThreads  EF_UNROLLED  thrpt   30  0.041 ± 0.006  ops/us
 ListWriteHeavyBench.fourThreads   EF_UNROLLED  thrpt   30  0.038 ± 0.005  ops/us
-*
 * */
 
-
+/*
+* ListWriteHeavyBench.eightThreads   PC_LS  thrpt   30  0.037 ± 0.004  ops/us
+* */
 
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -75,8 +76,8 @@ ListWriteHeavyBench.fourThreads   EF_UNROLLED  thrpt   30  0.038 ± 0.005  ops/u
 @Fork(3)
 public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     private ConcurrentCollection<Integer> set;
-
-    @Param({"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED", "ELIM_UNROLLED", "LOCAL_ELIM", "ELIM_UNROLLED", "UNROLLED"})
+    //
+    @Param({"PC_LS"})
     private String type;
 
     @Setup
@@ -90,6 +91,8 @@ public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
             case "UNROLLED" -> new UnrolledConcurrentList<>();
             case "EF_UNROLLED" -> new EFUnrolledConcurrentList<>();
             case "LOCAL_ELIM" -> new LocalEFUnrolledConcurrentList<>();
+            case "PC_LS" -> new PCLinkedList<>();
+
             default -> throw new IllegalArgumentException();
         };
 
@@ -112,11 +115,11 @@ public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
         doWork(bh);
     }
 
-    @Threads(4)
-    @Benchmark
-    public void fourThreads(Blackhole bh) {
-        doWork(bh);
-    }
+//    @Threads(4)
+//    @Benchmark
+//    public void fourThreads(Blackhole bh) {
+//        doWork(bh);
+//    }
 
     private void doWork(Blackhole bh) {
         int key = ThreadLocalRandom.current().nextInt(10_000);

@@ -3,6 +3,10 @@ package io.github.kusoroadeolu.sl.jmh;
 import io.github.kusoroadeolu.sl.*;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
+import org.openjdk.jmh.profile.JavaFlightRecorderProfiler;
+import org.openjdk.jmh.runner.RunnerException;
+import org.openjdk.jmh.runner.options.Options;
+import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -46,6 +50,10 @@ ListReadHeavyBench.fourThreads   UNROLLED  avgt   30  0.931 ± 0.022  us/op
 
 
 
+/*
+* ListReadHeavyBench.eightThreads   PC_LS  thrpt   30  0.484 ± 0.046  ops/us
+* */
+
 
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -56,7 +64,10 @@ ListReadHeavyBench.fourThreads   UNROLLED  avgt   30  0.931 ± 0.022  us/op
 public class ListReadHeavyBench {
     private ConcurrentCollection<Integer> set;
 
-    @Param({"UNROLLED", "LF_FR", "LAZY", "LAZY_COARSE", "LOCK", "EF_UNROLLED"})
+    /*
+    *
+    * */
+    @Param({"PC_LS"})
     private String type;
 
     @Setup
@@ -68,6 +79,7 @@ public class ListReadHeavyBench {
             case "LAZY_COARSE" -> new LazyCoarseSyncList<>();
             case "LOCK" -> new LockedOrderedLL<>();
             case "EF_UNROLLED" -> new EFUnrolledConcurrentList<>();
+            case "PC_LS" -> new PCLinkedList<>();
             default -> throw new IllegalArgumentException();
         };
 
@@ -82,18 +94,19 @@ public class ListReadHeavyBench {
 
         ls.clear();
     }
-
-    @Threads(4)
-    @Benchmark
-    public void fourThreads(Blackhole bh) {
-        doWork(bh);
-    }
+//
+//    @Threads(4)
+//    @Benchmark
+//    public void fourThreads(Blackhole bh) {
+//        doWork(bh);
+//    }
 
     @Threads(8)
     @Benchmark
     public void eightThreads(Blackhole bh) {
         doWork(bh);
     }
+
 
 
     private void doWork(Blackhole bh) {
@@ -108,4 +121,14 @@ public class ListReadHeavyBench {
             bh.consume(set.remove(key));
         }
     }
+
+    static class BenchRunner {
+        static void main() throws RunnerException {
+            Options options = new OptionsBuilder()
+                    .include(ListReadHeavyBench.class.getSimpleName())
+                    .addProfiler(JavaFlightRecorderProfiler.class, "dir=C:\\jfr-sl")
+                    .build();
+            new org.openjdk.jmh.runner.Runner(options).run();        }
+    }
+
 }
