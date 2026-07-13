@@ -37,10 +37,19 @@ public class PCLinkedList<T extends Comparable<T>> implements ConcurrentCollecti
         * */
         outer: for (;;) {
             Node<T> head = this.head;
+
+            if (containsFrom(head, t)) return false;
+
             node.next = null;
 
             if (head == null){
                 if (casHead(null, node)) return true;
+                else continue;
+            }
+
+            if (t.compareTo(head.item) < 0) {
+                node.next = head;
+                if (casHead(head, node)) return true;
                 else continue;
             }
 
@@ -59,7 +68,7 @@ public class PCLinkedList<T extends Comparable<T>> implements ConcurrentCollecti
                     node.next = curr;
                     if (casHead(head, newHead)) return true;
                     else continue outer;
-                } else if (curr.item.compareTo(t) == 0) return false;
+                }
 
                 var newCurr = new Node<>(curr.item, curr.next);
                 pred.next = newCurr;

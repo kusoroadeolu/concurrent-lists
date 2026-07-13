@@ -40,20 +40,20 @@ ListWriteHeavyBench.fourThreads   LAZY_COARSE  avgt   30   45.808 ±  1.560  us/
 //UNROLLED Variants
 /* ArraySize Per Node = 64
 Benchmark                                (type)   Mode  Cnt  Score   Error   Units
-ListWriteHeavyBench.eightThreads     LOCAL_ELIM  thrpt   30  2.317 ± 0.121  ops/us
+ListWriteHeavyBench.eightThreads     LOCAL_EF  thrpt   30  2.317 ± 0.121  ops/us
 ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  thrpt   30  3.262 ± 0.266  ops/us
 ListWriteHeavyBench.eightThreads       UNROLLED  thrpt   30  4.228 ± 0.140  ops/us
-ListWriteHeavyBench.fourThreads      LOCAL_ELIM  thrpt   30  1.928 ± 0.107  ops/us
+ListWriteHeavyBench.fourThreads      LOCAL_EF  thrpt   30  1.928 ± 0.107  ops/us
 ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  thrpt   30  2.707 ± 0.110  ops/us
 ListWriteHeavyBench.fourThreads        UNROLLED  thrpt   30  3.025 ± 0.081  ops/us
 
 
 
 Benchmark                                (type)  Mode  Cnt  Score   Error  Units
-ListWriteHeavyBench.eightThreads     LOCAL_ELIM  avgt   30  2.969 ± 0.153  us/op
+ListWriteHeavyBench.eightThreads     LOCAL_EF  avgt   30  2.969 ± 0.153  us/op
 ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  avgt   30  2.191 ± 0.108  us/op
 ListWriteHeavyBench.eightThreads       UNROLLED  avgt   30  2.053 ± 0.086  us/op
-ListWriteHeavyBench.fourThreads      LOCAL_ELIM  avgt   30  1.697 ± 0.044  us/op
+ListWriteHeavyBench.fourThreads      LOCAL_EF  avgt   30  1.697 ± 0.044  us/op
 ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  avgt   30  1.200 ± 0.027  us/op
 ListWriteHeavyBench.fourThreads        UNROLLED  avgt   30  1.224 ± 0.109  us/op
 * */
@@ -77,7 +77,7 @@ ListWriteHeavyBench.fourThreads   EF_UNROLLED  thrpt   30  0.038 ± 0.005  ops/u
 public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
     private ConcurrentCollection<Integer> set;
     //
-    @Param({"PC_LS"})
+    @Param({"LF_FR", "PC_LS","ELIM_UNROLLED", "LAZY", "LAZY_COARSE", "LOCK", "UNROLLED", "EF_UNROLLED", "LOCAL_EF" })
     private String type;
 
     @Setup
@@ -90,7 +90,7 @@ public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
             case "LOCK" -> new LockedOrderedLL<>();
             case "UNROLLED" -> new UnrolledConcurrentList<>();
             case "EF_UNROLLED" -> new EFUnrolledConcurrentList<>();
-            case "LOCAL_ELIM" -> new LocalEFUnrolledConcurrentList<>();
+            case "LOCAL_EF" -> new LocalEFUnrolledConcurrentList<>();
             case "PC_LS" -> new PCLinkedList<>();
 
             default -> throw new IllegalArgumentException();

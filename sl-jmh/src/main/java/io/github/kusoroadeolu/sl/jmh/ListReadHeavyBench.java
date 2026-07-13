@@ -67,7 +67,7 @@ public class ListReadHeavyBench {
     /*
     *
     * */
-    @Param({"PC_LS"})
+    @Param({"LF_FR", "PC_LS","ELIM_UNROLLED", "LAZY", "LAZY_COARSE", "LOCK", "UNROLLED", "EF_UNROLLED" })
     private String type;
 
     @Setup
