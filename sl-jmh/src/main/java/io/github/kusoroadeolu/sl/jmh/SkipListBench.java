@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-@BenchmarkMode(Mode.AverageTime)
+@BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 @Warmup(iterations = 10, time = 1)
@@ -64,7 +64,7 @@ SkipListBench.fourThreads       FG  avgt   30    0.982 ± 0.036  us/op
 * */
 public class SkipListBench {
     private Collection<Integer> set;
-    @Param({"JDK", "OPT", "FG"}) //JDK, Ours, fine grained(from a random repository that implemented the same paper)
+    @Param({"OPT", "JDK" ,"FG"}) //JDK, Ours, fine grained(from a random repository that implemented the same paper)
     private String type;
 
     @Setup
@@ -76,12 +76,6 @@ public class SkipListBench {
             default -> throw new IllegalArgumentException();
         };
 
-    }
-
-    @Threads(4)
-    @Benchmark
-    public void fourThreads(Blackhole bh) {
-        doWork(bh);
     }
 
     @Threads(8)
@@ -108,7 +102,7 @@ public class SkipListBench {
         static void main() throws RunnerException {
             Options options = new OptionsBuilder()
                     .include(SkipListBench.class.getSimpleName())
-                    .addProfiler(JavaFlightRecorderProfiler.class, "dir=C:\\jfr-sl")
+                  //  .addProfiler(JavaFlightRecorderProfiler.class, "dir=C:\\jfr-sl")
                     .build();
             new org.openjdk.jmh.runner.Runner(options).run();        }
     }
