@@ -9,6 +9,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static io.github.kusoroadeolu.sl.EliminationNode.NCPU;
 import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.Operation;
+import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.filterNulls;
 
 /*
 * An improved variant of the EF Unrolled Concurrent List. The main issue with the previous version was:
@@ -117,7 +118,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
                             var n1 = nodes[0];
                             var n2 = nodes[1];
 
-                            curr.svMarked();
+                            curr.soMarked();
                             n1.spNext(n2);
                             n2.spNext(succ);
                             pred.soNext(n1); //Linearization point, makes n1 and n2 visible
@@ -191,7 +192,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
                     try {
                         var succ = curr.lpNext();
                         if (currSize == 0) {
-                            curr.svMarked();
+                            curr.soMarked();
                             pred.soNext(succ);
                             return true;
                         }
@@ -368,7 +369,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
             }
         }
 
-        succ.svMarked();
+        succ.soMarked();
 
         curr.increment(succ.size());
         curr.soNext(succ.lpNext());
@@ -494,10 +495,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
 
 
     static <T extends Comparable<T>>void redistribute(LocalEFNode<T> curr, LocalEFNode<T> succ, int succSize, int arrayCap ,int total) {
-        Object[] copy = Arrays.stream(succ.array.clone())
-                .filter(Objects::nonNull)
-                .toArray();
-
+        Object[] copy = filterNulls(succ.array, succSize);
         int nodeCount = total / 2;
         int toMove = succSize - nodeCount;
         Arrays.sort(copy);
@@ -511,7 +509,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
             }
         }
 
-        succ.svMarked();
+        succ.soMarked();
         curr.increment(toMove);
         node.increment(succSize - toMove);
         node.spNext(succ.lpNext());
@@ -651,7 +649,7 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
             return (boolean) MARKED.get(this);
         }
 
-        void svMarked(){
+        void soMarked(){
             MARKED.setRelease(this, true);
         }
 

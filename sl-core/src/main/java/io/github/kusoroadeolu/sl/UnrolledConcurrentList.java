@@ -125,7 +125,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                         var n1 = nodes[0];
                         var n2 = nodes[1];
 
-                        curr.svMarked(); //Prevent reorderings upward
+                        curr.soMarked(); //Prevent reorderings upward
 
                         n1.spNext(n2);
                         n2.spNext(succ);
@@ -176,7 +176,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
                 try {
                     var succ = curr.lpNext();
                     if (currSize == 0) {
-                        curr.svMarked();
+                        curr.soMarked();
                         pred.soNext(succ);
                         return true;
                     }
@@ -299,7 +299,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
             }
         }
 
-        succ.svMarked();
+        succ.soMarked();
 
         curr.increment(succ.size());
         curr.soNext(succ.lpNext()); //Plain read for succ as we already hold its lock
@@ -308,13 +308,12 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
 
 
     static <T extends Comparable<T>>void redistribute(Node<T> curr, Node<T> succ, int succSize, int arrayCap ,int total) {
-        Object[] copy = Arrays.stream(succ.array.clone())
-                .filter(Objects::nonNull)
-                .toArray();
+        Object[] copy = filterNulls(succ.array, succSize);
 
         int nodeCount = total / 2;
         int toMove = succSize - nodeCount;
         Arrays.sort(copy);
+
         var nodeArr = Arrays.copyOf(copy, arrayCap);
         var node = new Node<>((T) nodeArr[toMove], nodeArr);
         for (int i = 0, j = 0; i < arrayCap; ++i) {
@@ -326,7 +325,7 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         }
 
 
-        succ.svMarked();
+        succ.soMarked();
 
         curr.increment(toMove);
         node.increment(succSize - toMove);
@@ -343,6 +342,16 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
      * currSize = 5 + 3;
      *
      * */
+
+    static Object[] filterNulls(Object[] array, int size) {
+        Object[] copy = new Object[size];
+        int idx = 0;
+        for (Object o : array) {
+            if (o != null) copy[idx++] = o;
+        }
+
+        return copy;
+    }
 
     static <T extends Comparable<T>> void nullifyIndex(int index, int arrayCap ,Node<T> curr) {
         var arr = curr.array;
@@ -527,8 +536,8 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
             return (boolean) MARKED.get(this);
         }
 
-        void svMarked(){
-            MARKED.setVolatile(this, true);
+        void soMarked(){
+            MARKED.setRelease(this, true);
         }
 
         public Node<T> loNext() {

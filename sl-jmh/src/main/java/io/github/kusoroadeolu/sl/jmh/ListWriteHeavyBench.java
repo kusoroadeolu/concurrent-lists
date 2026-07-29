@@ -115,12 +115,6 @@ public class ListWriteHeavyBench { //50% adds, 40% removes, 10% contains
         doWork(bh);
     }
 
-//    @Threads(4)
-//    @Benchmark
-//    public void fourThreads(Blackhole bh) {
-//        doWork(bh);
-//    }
-
     private void doWork(Blackhole bh) {
         int key = ThreadLocalRandom.current().nextInt(10_000);
         int op = ThreadLocalRandom.current().nextInt(100);

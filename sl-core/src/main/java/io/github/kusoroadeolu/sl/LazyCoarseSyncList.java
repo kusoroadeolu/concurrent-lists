@@ -82,9 +82,8 @@ public class LazyCoarseSyncList<T extends Comparable<T>> implements ConcurrentCo
                 pred = curr; curr = pred.loNext();
             }
 
-            if (res != 0) return false;
+            if (res != 0 || curr.loMarked()) return false;
 
-            if (curr.loMarked()) return false;
             if (pred.loMarked()) continue;
 
             var lc = lock;

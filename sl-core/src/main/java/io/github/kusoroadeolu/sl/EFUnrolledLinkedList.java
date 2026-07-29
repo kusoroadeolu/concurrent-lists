@@ -84,7 +84,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
                         var n1 = nodes[0];
                         var n2 = nodes[1];
 
-                        curr.svMarked();
+                        curr.soMarked();
                         n1.spNext(n2);
                         n2.spNext(succ);
                         pred.soNext(n1); //Linearization point
@@ -172,7 +172,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
                 try {
                     var succ = curr.lpNext();
                     if (currSize == 0) {
-                        curr.svMarked(); //Could we use a weaker mode for marked, maybe use the next write as a HB relationship. The issue though is
+                        curr.soMarked(); //Could we use a weaker mode for marked, maybe use the next write as a HB relationship. The issue though is
                         //a thread has previously read prev and its next flag, it context switches, another thread adds and then marks
                         pred.soNext(succ);
                         return true;
@@ -308,7 +308,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
             }
         }
 
-        succ.svMarked();
+        succ.soMarked();
         curr.soNext(succ.lpNext()); //Plain read for succ as we already hold its lock
 
     }
@@ -332,7 +332,7 @@ public class EFUnrolledLinkedList<T extends Comparable<T>> {
         }
 
 
-        succ.svMarked();
+        succ.soMarked();
         node.spNext(succ.lpNext());
         curr.soNext(node);
     }

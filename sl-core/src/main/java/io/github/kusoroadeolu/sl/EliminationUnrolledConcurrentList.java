@@ -10,8 +10,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import static io.github.kusoroadeolu.sl.EliminationNode.NCPU;
-import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.Operation;
-import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.findNonNullIndex;
+import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.*;
 
 /*
 An elimination based unrolled linked list.
@@ -134,7 +133,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
                             var n2 = nodes[1];
 
 
-                            curr.svMarked();
+                            curr.soMarked();
 
                             n1.spNext(n2);
                             n2.spNext(succ);
@@ -148,8 +147,6 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
                 }finally {
                     pred.unlock();
                     metrics.incNodeSuccesses();
-                    nodes[0] = null;
-                    nodes[1] = null;
                 }
             }else {
                 if (info == null)
@@ -210,7 +207,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
                     try {
                         var succ = curr.lpNext();
                         if (currSize == 0) {
-                            curr.svMarked(); //Could we use a weaker mode for marked, maybe use the next write as a HB relationship. The issue though is
+                            curr.soMarked(); //Could we use a weaker mode for marked, maybe use the next write as a HB relationship. The issue though is
                             //a thread has previously read prev and its next flag, it context switches, another thread adds and then marks
                             pred.soNext(succ);
                             return true;
@@ -244,8 +241,6 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
                 }finally {
                     pred.unlock();
                     metrics.incNodeSuccesses();
-                    nodes[0] = null;
-                    nodes[1] = null;
                 }
             } else {
                 if (info == null)
@@ -423,7 +418,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
             }
         }
 
-        succ.svMarked();
+        succ.soMarked();
         curr.increment(succ.size());
         curr.soNext(succ.lpNext());
 
@@ -431,15 +426,14 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
 
 
     static <T extends Comparable<T>>void redistribute(EliminationNode<T> curr, EliminationNode<T> succ, int succSize, int arrayCap ,int total) {
-        Object[] copy = Arrays.stream(succ.array.clone())
-                .filter(Objects::nonNull)
-                .toArray();
+        Object[] copy = filterNulls(succ.array, succSize);
 
         int nodeCount = total / 2;
         int toMove = succSize - nodeCount;
         Arrays.sort(copy);
         var nodeArr = Arrays.copyOf(copy, arrayCap);
         var node = new EliminationNode<>((T) nodeArr[toMove], nodeArr);
+
         for (int i = 0, j = 0; i < arrayCap; ++i) {
             if (j == toMove) break;
             if (curr.lpArray(i) == null) {
@@ -448,7 +442,7 @@ public class EliminationUnrolledConcurrentList<T extends Comparable<T>> implemen
             }
         }
 
-        succ.svMarked();
+        succ.soMarked();
         curr.increment(toMove);
         node.increment(succSize - toMove);
         node.spNext(succ.lpNext());

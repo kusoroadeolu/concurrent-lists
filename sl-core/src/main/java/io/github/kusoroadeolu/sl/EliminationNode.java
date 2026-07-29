@@ -94,8 +94,8 @@ public class EliminationNode<T extends Comparable<T>> {
         return (boolean) MARKED.get(this);
     }
 
-    void svMarked(){
-        MARKED.setVolatile(this, true);
+    void soMarked(){
+        MARKED.setRelease(this, true);
     }
 
     public EliminationNode<T> loNext() {
