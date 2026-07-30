@@ -14,61 +14,41 @@ import java.util.concurrent.TimeUnit;
 
 
 /*
-* Benchmark                              (type)   Mode  Cnt  Score    Error   Units
-ListWriteHeavyBench.eightThreads         LF_FR  thrpt   30  0.153 ± 0.007  ops/us
-ListWriteHeavyBench.eightThreads         LAZY  thrpt   30  0.143 ±  0.004  ops/us
-ListWriteHeavyBench.eightThreads         LOCK  thrpt   30  0.026 ±  0.001  ops/us
-ListWriteHeavyBench.eightThreads  LAZY_COARSE  thrpt   30  0.147 ±  0.002  ops/us
-ListWriteHeavyBench.fourThreads          LF_FR  thrpt   30  0.080 ± 0.003  ops/us
-ListWriteHeavyBench.fourThreads          LAZY  thrpt   30  0.081 ±  0.002  ops/us
-ListWriteHeavyBench.fourThreads          LOCK  thrpt   30  0.026 ±  0.001  ops/us
-ListWriteHeavyBench.fourThreads   LAZY_COARSE  thrpt   30  0.083 ±  0.004  ops/us
+╭ io.github.kusoroadeolu.sl.jmh.ListWriteHeavyBench.eightThreads ─╮
+│  Type          Score Error   Unit                               │
+│  ------------- ----- ------- ------                             │
+│  LF_FR         0.209 ± 0.003 ops/us                             │
+│  PC_LS         0.035 ± 0.001 ops/us                             │
+│  ELIM_UNROLLED 6.098 ± 0.326 ops/us                             │
+│  LAZY          0.220 ± 0.003 ops/us                             │
+│  LAZY_COARSE   0.225 ± 0.003 ops/us                             │
+│  LOCK          0.033 ± 0.000 ops/us                             │
+│  UNROLLED      6.908 ± 0.194 ops/us                             │
+│  EF_UNROLLED   0.076 ± 0.011 ops/us                             │
+│  LOCAL_EF      4.617 ± 0.201 ops/us                             │
+╰─────────────────────────────────────────────────────────────────╯
+Generated with JMHPretty
 * */
 
 /*
-* Benchmark                              (type)  Mode  Cnt    Score    Error  Units
-ListWriteHeavyBench.eightThreads         LF_FR  avgt   30  51.434 ± 0.890  us/op
-ListWriteHeavyBench.eightThreads         LAZY  avgt   30   54.703 ±  1.227  us/op
-ListWriteHeavyBench.eightThreads         LOCK  avgt   30  322.620 ± 20.590  us/op
-ListWriteHeavyBench.eightThreads  LAZY_COARSE  avgt   30   52.474 ±  1.720  us/op
-ListWriteHeavyBench.fourThreads          LF_FR  avgt   30  51.607 ± 2.077  us/op
-ListWriteHeavyBench.fourThreads          LAZY  avgt   30   45.701 ±  1.228  us/op
-ListWriteHeavyBench.fourThreads          LOCK  avgt   30  153.047 ±  1.507  us/op
-ListWriteHeavyBench.fourThreads   LAZY_COARSE  avgt   30   45.808 ±  1.560  us/op
+╭─────── io.github.kusoroadeolu.sl.jmh.ListWriteHeavyBench.eightThreads ───────╮
+│  Type          Score   Error   P99      P99.9     P99.99    Max       Unit   │
+│  ------------- ------- ------- -------- --------- --------- --------- -----  │
+│  LF_FR         39.052  ± 0.180 89.728   786.961   2393.095  30441.472 us/op  │
+│  PC_LS         243.078 ± 5.586 6146.376 24510.464 48658.239 93192.192 us/op  │
+│  ELIM_UNROLLED 1.909   ± 0.040 14.096   53.376    1652.736  11042.816 us/op  │
+│  LAZY          37.725  ± 0.119 82.560   657.408   2088.960  19595.264 us/op  │
+│  LAZY_COARSE   37.267  ± 0.096 82.176   713.728   1787.904  10174.464 us/op  │
+│  LOCK          241.653 ± 2.479 3469.312 4325.376  5201.920  6520.832  us/op  │
+│  UNROLLED      1.598   ± 0.036 2.400    28.992    1132.544  14385.152 us/op  │
+│  EF_UNROLLED   119.099 ± 0.498 310.784  1594.077  9907.991  38666.240 us/op  │
+│  LOCAL_EF      2.124   ± 0.063 3.300    31.072    908.288   31948.800 us/op  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Generated with JMHPretty
+
 * */
 
-//UNROLLED Variants
-/* ArraySize Per Node = 64
-Benchmark                                (type)   Mode  Cnt  Score   Error   Units
-ListWriteHeavyBench.eightThreads     LOCAL_EF  thrpt   30  2.317 ± 0.121  ops/us
-ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  thrpt   30  3.262 ± 0.266  ops/us
-ListWriteHeavyBench.eightThreads       UNROLLED  thrpt   30  4.228 ± 0.140  ops/us
-ListWriteHeavyBench.fourThreads      LOCAL_EF  thrpt   30  1.928 ± 0.107  ops/us
-ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  thrpt   30  2.707 ± 0.110  ops/us
-ListWriteHeavyBench.fourThreads        UNROLLED  thrpt   30  3.025 ± 0.081  ops/us
-
-
-
-Benchmark                                (type)  Mode  Cnt  Score   Error  Units
-ListWriteHeavyBench.eightThreads     LOCAL_EF  avgt   30  2.969 ± 0.153  us/op
-ListWriteHeavyBench.eightThreads  ELIM_UNROLLED  avgt   30  2.191 ± 0.108  us/op
-ListWriteHeavyBench.eightThreads       UNROLLED  avgt   30  2.053 ± 0.086  us/op
-ListWriteHeavyBench.fourThreads      LOCAL_EF  avgt   30  1.697 ± 0.044  us/op
-ListWriteHeavyBench.fourThreads   ELIM_UNROLLED  avgt   30  1.200 ± 0.027  us/op
-ListWriteHeavyBench.fourThreads        UNROLLED  avgt   30  1.224 ± 0.109  us/op
-* */
-
-/*
-Benchmark                              (type)   Mode  Cnt  Score   Error   Units
-ListWriteHeavyBench.eightThreads  EF_UNROLLED  thrpt   30  0.041 ± 0.006  ops/us
-ListWriteHeavyBench.fourThreads   EF_UNROLLED  thrpt   30  0.038 ± 0.005  ops/us
-* */
-
-/*
-* ListWriteHeavyBench.eightThreads   PC_LS  thrpt   30  0.037 ± 0.004  ops/us
-* */
-
-@BenchmarkMode(Mode.Throughput)
+@BenchmarkMode(Mode.SampleTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 @Warmup(iterations = 10, time = 1)

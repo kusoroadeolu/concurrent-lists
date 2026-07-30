@@ -1,8 +1,6 @@
 package io.github.kusoroadeolu.sl.jmh;
 
-import io.github.kusoroadeolu.sl.ConcurrentCollection;
-import io.github.kusoroadeolu.sl.EliminationMetrics;
-import io.github.kusoroadeolu.sl.EliminationUnrolledConcurrentList;
+import io.github.kusoroadeolu.sl.*;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.profile.JavaFlightRecorderProfiler;
@@ -14,7 +12,7 @@ import java.util.List;
 import java.util.SplittableRandom;
 import java.util.concurrent.TimeUnit;
 
-@BenchmarkMode(Mode.Throughput)
+@BenchmarkMode(Mode.SampleTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Warmup(iterations = 10, time = 1)
 @Measurement(iterations = 10, time = 1)
@@ -25,15 +23,15 @@ import java.util.concurrent.TimeUnit;
 
 /* 100% Writes
 Benchmark                                                 (keySpaceSize)         (type)   Mode  Cnt  Score   Error   Units
-ZipfianBenchmark.fullWrite                             64  ELIM_UNROLLED  thrpt   30  3.131 ± 0.096  ops/us
-ZipfianBenchmark.fullWrite:arenaSuccesses              64  ELIM_UNROLLED  thrpt   30  1.217 ± 0.037  ops/us
-ZipfianBenchmark.fullWrite:nodeSuccesses               64  ELIM_UNROLLED  thrpt   30  1.307 ± 0.045  ops/us
-ZipfianBenchmark.fullWrite                            128  ELIM_UNROLLED  thrpt   30  2.132 ± 0.426  ops/us
-ZipfianBenchmark.fullWrite:arenaSuccesses             128  ELIM_UNROLLED  thrpt   30  0.806 ± 0.183  ops/us
-ZipfianBenchmark.fullWrite:nodeSuccesses              128  ELIM_UNROLLED  thrpt   30  0.931 ± 0.157  ops/us
-ZipfianBenchmark.fullWrite                            256  ELIM_UNROLLED  thrpt   30  2.363 ± 0.475  ops/us
-ZipfianBenchmark.fullWrite:arenaSuccesses             256  ELIM_UNROLLED  thrpt   30  0.911 ± 0.191  ops/us
-ZipfianBenchmark.fullWrite:nodeSuccesses              256  ELIM_UNROLLED  thrpt   30  0.999 ± 0.189  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite                             64  ELIM_UNROLLED  thrpt   30  3.131 ± 0.096  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite:arenaSuccesses              64  ELIM_UNROLLED  thrpt   30  1.217 ± 0.037  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite:nodeSuccesses               64  ELIM_UNROLLED  thrpt   30  1.307 ± 0.045  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite                            128  ELIM_UNROLLED  thrpt   30  2.132 ± 0.426  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite:arenaSuccesses             128  ELIM_UNROLLED  thrpt   30  0.806 ± 0.183  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite:nodeSuccesses              128  ELIM_UNROLLED  thrpt   30  0.931 ± 0.157  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite                            256  ELIM_UNROLLED  thrpt   30  2.363 ± 0.475  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite:arenaSuccesses             256  ELIM_UNROLLED  thrpt   30  0.911 ± 0.191  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite:nodeSuccesses              256  ELIM_UNROLLED  thrpt   30  0.999 ± 0.189  ops/us
 */
 
 /*
@@ -59,53 +57,53 @@ ZipfianBenchmark.fullWrite:nodeSuccesses              256  ELIM_UNROLLED  thrpt 
 
 /* After
 Benchmark                                  (keySpaceSize)         (type)   Mode  Cnt  Score   Error   Units
-ZipfianBenchmark.fullWrite                             64  ELIM_UNROLLED  thrpt   30  4.381 ± 0.143  ops/us
-ZipfianBenchmark.fullWrite:arenaSuccesses              64  ELIM_UNROLLED  thrpt   30  1.461 ± 0.063  ops/us
-ZipfianBenchmark.fullWrite:nodeSuccesses               64  ELIM_UNROLLED  thrpt   30  1.997 ± 0.063  ops/us
-ZipfianBenchmark.fullWrite                            128  ELIM_UNROLLED  thrpt   30  4.229 ± 0.124  ops/us
-ZipfianBenchmark.fullWrite:arenaSuccesses             128  ELIM_UNROLLED  thrpt   30  1.454 ± 0.044  ops/us
-ZipfianBenchmark.fullWrite:nodeSuccesses              128  ELIM_UNROLLED  thrpt   30  1.893 ± 0.058  ops/us
-ZipfianBenchmark.fullWrite                            256  ELIM_UNROLLED  thrpt   30  3.938 ± 0.361  ops/us
-ZipfianBenchmark.fullWrite:arenaSuccesses             256  ELIM_UNROLLED  thrpt   30  1.172 ± 0.276  ops/us
-ZipfianBenchmark.fullWrite:nodeSuccesses              256  ELIM_UNROLLED  thrpt   30  1.950 ± 0.057  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite                             64  ELIM_UNROLLED  thrpt   30  4.381 ± 0.143  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite:arenaSuccesses              64  ELIM_UNROLLED  thrpt   30  1.461 ± 0.063  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite:nodeSuccesses               64  ELIM_UNROLLED  thrpt   30  1.997 ± 0.063  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite                            128  ELIM_UNROLLED  thrpt   30  4.229 ± 0.124  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite:arenaSuccesses             128  ELIM_UNROLLED  thrpt   30  1.454 ± 0.044  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite:nodeSuccesses              128  ELIM_UNROLLED  thrpt   30  1.893 ± 0.058  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite                            256  ELIM_UNROLLED  thrpt   30  3.938 ± 0.361  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite:arenaSuccesses             256  ELIM_UNROLLED  thrpt   30  1.172 ± 0.276  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite:nodeSuccesses              256  ELIM_UNROLLED  thrpt   30  1.950 ± 0.057  ops/us
 * */
 
 /*
 * Benchmark                   (keySpaceSize)         (type)   Mode  Cnt  Score   Error   Units
-ZipfianBenchmark.fullWrite              64  UNROLLED  thrpt   30  2.055 ± 0.177  ops/us
-ZipfianBenchmark.fullWrite             128  UNROLLED  thrpt   30  1.726 ± 0.056  ops/us
-ZipfianBenchmark.fullWrite             256  UNROLLED  thrpt   30  1.863 ± 0.163  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite              64  UNROLLED  thrpt   30  2.055 ± 0.177  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite             128  UNROLLED  thrpt   30  1.726 ± 0.056  ops/us
+ElimUnrolledZipfianBenchmark.fullWrite             256  UNROLLED  thrpt   30  1.863 ± 0.163  ops/us
 * */
 public class ZipfianBenchmark {
 
     @Param({"64", "128", "256"})
     int keySpaceSize;
 
-    @Param({"ELIM_UNROLLED"})
+    @Param({"ELIM_UNROLLED", "UNROLLED", "LOCAL_EF"})
     private String type;
 
-    private EliminationUnrolledConcurrentList<Integer> set;
+    private ConcurrentCollection<Integer> set;
     private ZipfianGenerator zipf;
 
-    @State(Scope.Thread)
-   @AuxCounters(AuxCounters.Type.OPERATIONS)
+   @State(Scope.Thread)
+ //  @AuxCounters(AuxCounters.Type.OPERATIONS)
     public static class ThreadState {
         SplittableRandom rng;
-        public int nodeSuccesses;
-        public int arenaSuccesses;
+//        public int nodeSuccesses;
+//        public int arenaSuccesses;
 
         @Setup(Level.Trial)
         public void setup() {
             rng = new SplittableRandom();
         }
 
-        @TearDown(Level.Iteration)
-        public void teardown(ZipfianBenchmark benchmark) {
-            EliminationMetrics m = benchmark.set.metrics();
-            nodeSuccesses  = m.nodeSuccesses();
-            arenaSuccesses = m.arenaSuccesses();
-            m.reset();
-        }
+//        @TearDown(Level.Iteration)
+//        public void teardown(ZipfianBenchmark benchmark) {
+//            EliminationMetrics m = benchmark.set.metrics();
+//            nodeSuccesses  = m.nodeSuccesses();
+//            arenaSuccesses = m.arenaSuccesses();
+//            m.reset();
+//        }
     }
 
     @TearDown
@@ -120,9 +118,10 @@ public class ZipfianBenchmark {
 
     @Setup(Level.Trial)
     public void setup() {
-
         set = switch (type) {
             case "ELIM_UNROLLED" -> new EliminationUnrolledConcurrentList<>();
+            case "UNROLLED" -> new UnrolledConcurrentList<>();
+            case "LOCAL_EF" -> new LocalEFUnrolledConcurrentList<>();
             default -> throw new IllegalArgumentException();
         };
         zipf      = new ZipfianGenerator(keySpaceSize, 2.0);
@@ -194,3 +193,68 @@ public class ZipfianBenchmark {
             new org.openjdk.jmh.runner.Runner(options).run();        }
     }
 }
+
+/*
+╭ io.github.kusoroadeolu.sl.jmh.ZipfianBenchmark.eightyWriteTwentyRead ─╮
+│  KeySpaceSize Type          Score Error   Unit                        │
+│  ------------ ------------- ----- ------- ------                      │
+│  64           ELIM_UNROLLED 6.816 ± 0.853 ops/us                      │
+│  64           UNROLLED      4.655 ± 0.198 ops/us                      │
+│  64           LOCAL_EF      5.742 ± 0.186 ops/us                      │
+│  128          ELIM_UNROLLED 7.096 ± 0.504 ops/us                      │
+│  128          UNROLLED      4.900 ± 0.074 ops/us                      │
+│  128          LOCAL_EF      5.743 ± 0.138 ops/us                      │
+│  256          ELIM_UNROLLED 7.033 ± 0.468 ops/us                      │
+│  256          UNROLLED      4.836 ± 0.120 ops/us                      │
+│  256          LOCAL_EF      5.419 ± 0.162 ops/us                      │
+╰───────────────────────────────────────────────────────────────────────╯
+
+
+╭ io.github.kusoroadeolu.sl.jmh.ZipfianBenchmark.fullWrite ─╮
+│  KeySpaceSize Type          Score Error   Unit            │
+│  ------------ ------------- ----- ------- ------          │
+│  64           ELIM_UNROLLED 6.016 ± 0.532 ops/us          │
+│  64           UNROLLED      4.858 ± 0.437 ops/us          │
+│  64           LOCAL_EF      4.788 ± 0.171 ops/us          │
+│  128          ELIM_UNROLLED 5.637 ± 0.479 ops/us          │
+│  128          UNROLLED      4.748 ± 0.330 ops/us          │
+│  128          LOCAL_EF      3.530 ± 1.284 ops/us          │
+│  256          ELIM_UNROLLED 5.832 ± 0.388 ops/us          │
+│  256          UNROLLED      4.584 ± 0.429 ops/us          │
+│  256          LOCAL_EF      3.840 ± 0.813 ops/us          │
+╰───────────────────────────────────────────────────────────╯
+Generated with JMHPretty
+
+
+
+╭─────── io.github.kusoroadeolu.sl.jmh.ZipfianBenchmark.eightyWriteTwentyRead ───────╮
+│  KeySpaceSize Type          Score Error   P99    P99.9   P99.99   Max       Unit   │
+│  ------------ ------------- ----- ------- ------ ------- -------- --------- -----  │
+│  64           ELIM_UNROLLED 1.770 ± 0.052 12.992 67.584  1790.217 37748.736 us/op  │
+│  64           UNROLLED      1.918 ± 0.014 64.640 93.056  153.088  3051.520  us/op  │
+│  64           LOCAL_EF      2.827 ± 0.046 32.768 283.301 1595.663 6012.928  us/op  │
+│  128          ELIM_UNROLLED 1.812 ± 0.048 15.600 70.400  1490.944 22380.544 us/op  │
+│  128          UNROLLED      2.019 ± 0.018 68.224 125.312 191.149  4177.920  us/op  │
+│  128          LOCAL_EF      2.196 ± 0.040 23.200 81.664  1603.584 20152.320 us/op  │
+│  256          ELIM_UNROLLED 1.309 ± 0.049 11.792 33.664  271.782  31981.568 us/op  │
+│  256          UNROLLED      1.964 ± 0.014 63.872 97.792  157.696  2510.848  us/op  │
+│  256          LOCAL_EF      6.684 ± 0.265 31.296 626.688 9846.784 33062.912 us/op  │
+╰────────────────────────────────────────────────────────────────────────────────────╯
+
+
+╭────────────── io.github.kusoroadeolu.sl.jmh.ZipfianBenchmark.fullWrite ───────────────╮
+│  KeySpaceSize Type          Score  Error   P99    P99.9    P99.99    Max       Unit   │
+│  ------------ ------------- ------ ------- ------ -------- --------- --------- -----  │
+│  64           ELIM_UNROLLED 1.502  ± 0.052 12.896 35.776   416.870   26705.920 us/op  │
+│  64           UNROLLED      2.068  ± 0.013 63.680 82.304   114.432   1488.896  us/op  │
+│  64           LOCAL_EF      7.146  ± 0.243 35.264 1015.808 9420.800  28049.408 us/op  │
+│  128          ELIM_UNROLLED 1.580  ± 0.061 12.992 36.160   523.325   24576.000 us/op  │
+│  128          UNROLLED      2.232  ± 0.026 64.064 88.704   424.448   14860.288 us/op  │
+│  128          LOCAL_EF      13.577 ± 0.349 54.464 3778.343 12304.384 31883.264 us/op  │
+│  256          ELIM_UNROLLED 1.709  ± 0.070 14.192 38.656   552.808   26050.560 us/op  │
+│  256          UNROLLED      2.154  ± 0.016 64.960 117.248  187.904   5005.312  us/op  │
+│  256          LOCAL_EF      11.083 ± 0.336 42.368 3235.840 11812.864 31784.960 us/op  │
+╰───────────────────────────────────────────────────────────────────────────────────────╯
+Generated with JMHPretty
+
+* */

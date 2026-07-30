@@ -12,50 +12,34 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
-
 /*
-* Benchmark                             (type)   Mode  Cnt  Score    Error   Units
-ListReadHeavyBench.eightThreads         LF_FR  thrpt   30  0.070 ± 0.003  ops/us
-ListReadHeavyBench.eightThreads         LAZY  thrpt   30  0.079 ±  0.003  ops/us
-ListReadHeavyBench.eightThreads         LOCK  thrpt   30  0.015 ±  0.001  ops/us
-ListReadHeavyBench.eightThreads  LAZY_COARSE  thrpt   30  0.078 ±  0.003  ops/us
-ListReadHeavyBench.fourThreads          LF_FR  thrpt   30  0.043 ± 0.001  ops/us
-ListReadHeavyBench.fourThreads          LAZY  thrpt   30  0.047 ±  0.003  ops/us
-ListReadHeavyBench.fourThreads          LOCK  thrpt   30  0.017 ±  0.001  ops/us
-ListReadHeavyBench.fourThreads   LAZY_COARSE  thrpt   30  0.051 ±  0.001  ops/us
+╭ io.github.kusoroadeolu.sl.jmh.ListReadHeavyBench.eightThreads ─╮
+│  Type        Score Error   Unit                                │
+│  ----------- ----- ------- ------                              │
+│  LF_FR       0.092 ± 0.003 ops/us                              │
+│  PC_LS       0.323 ± 0.021 ops/us                              │
+│  LAZY        0.110 ± 0.002 ops/us                              │
+│  LAZY_COARSE 0.109 ± 0.003 ops/us                              │
+│  LOCK        0.020 ± 0.000 ops/us                              │
+│  UNROLLED    7.299 ± 0.125 ops/us                              │
+╰────────────────────────────────────────────────────────────────╯
+Generated with JMHPretty
+
+
+╭───── io.github.kusoroadeolu.sl.jmh.ListReadHeavyBench.eightThreads ──────╮
+│  Type        Score   Error   P99      P99.9    P99.99   Max       Unit   │
+│  ----------- ------- ------- -------- -------- -------- --------- -----  │
+│  LF_FR       73.008  ± 0.226 204.800  303.104  3371.882 33095.680 us/op  │
+│  PC_LS       23.463  ± 0.131 105.984  771.069  2990.080 32374.784 us/op  │
+│  LAZY        60.250  ± 0.187 142.848  220.076  2764.800 26181.632 us/op  │
+│  LAZY_COARSE 61.044  ± 0.264 144.384  266.240  4653.056 36175.872 us/op  │
+│  LOCK        177.835 ± 1.634 2560.000 6033.719 8437.760 13221.888 us/op  │
+│  UNROLLED    1.289   ± 0.045 2.100    13.696   178.414  34078.720 us/op  │
+╰──────────────────────────────────────────────────────────────────────────╯
+Generated with JMHPretty
 * */
 
-/*
-* Benchmark                             (type)  Mode  Cnt    Score    Error  Units
-ListReadHeavyBench.eightThreads         LF_FR  avgt   30  108.866 ± 3.705  us/op
-ListReadHeavyBench.eightThreads         LAZY  avgt   30   97.138 ±  2.577  us/op
-ListReadHeavyBench.eightThreads         LOCK  avgt   30  488.376 ± 15.631  us/op
-ListReadHeavyBench.eightThreads  LAZY_COARSE  avgt   30   96.848 ±  2.490  us/op
-ListReadHeavyBench.fourThreads          LF_FR  avgt   30   89.309 ± 2.178  us/op
-ListReadHeavyBench.fourThreads          LAZY  avgt   30   76.837 ±  1.412  us/op
-ListReadHeavyBench.fourThreads          LOCK  avgt   30  252.087 ± 14.362  us/op
-ListReadHeavyBench.fourThreads   LAZY_COARSE  avgt   30   87.068 ±  6.050  us/op
-* */
-
-
-/*
-* Benchmark                          (type)   Mode  Cnt   Score   Error   Units
-ListReadHeavyBench.eightThreads  UNROLLED  thrpt   30  5.511 ± 0.100  ops/us
-ListReadHeavyBench.fourThreads   UNROLLED  thrpt   30  4.318 ± 0.062  ops/us
-*
-Benchmark                          (type)  Mode  Cnt  Score   Error  Units
-ListReadHeavyBench.eightThreads  UNROLLED  avgt   30  1.409 ± 0.022  us/op
-ListReadHeavyBench.fourThreads   UNROLLED  avgt   30  0.931 ± 0.022  us/op
-* */
-
-
-
-/*
-* ListReadHeavyBench.eightThreads   PC_LS  thrpt   30  0.484 ± 0.046  ops/us
-* */
-
-
-@BenchmarkMode(Mode.Throughput)
+@BenchmarkMode(Mode.SampleTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 @Warmup(iterations = 10, time = 1)
@@ -64,10 +48,7 @@ ListReadHeavyBench.fourThreads   UNROLLED  avgt   30  0.931 ± 0.022  us/op
 public class ListReadHeavyBench {
     private ConcurrentCollection<Integer> set;
 
-    /*
-    *
-    * */
-    @Param({"LF_FR", "PC_LS","ELIM_UNROLLED", "LAZY", "LAZY_COARSE", "LOCK", "UNROLLED", "EF_UNROLLED" })
+    @Param({"LF_FR", "PC_LS", "LAZY", "LAZY_COARSE", "LOCK", "UNROLLED"})
     private String type;
 
     @Setup
@@ -78,7 +59,6 @@ public class ListReadHeavyBench {
             case "LAZY" -> new LazySyncList<>();
             case "LAZY_COARSE" -> new LazyCoarseSyncList<>();
             case "LOCK" -> new LockedOrderedLL<>();
-            case "EF_UNROLLED" -> new EFUnrolledConcurrentList<>();
             case "PC_LS" -> new PCLinkedList<>();
             default -> throw new IllegalArgumentException();
         };
@@ -94,12 +74,7 @@ public class ListReadHeavyBench {
 
         ls.clear();
     }
-//
-//    @Threads(4)
-//    @Benchmark
-//    public void fourThreads(Blackhole bh) {
-//        doWork(bh);
-//    }
+
 
     @Threads(8)
     @Benchmark
