@@ -1,6 +1,9 @@
 package io.github.kusoroadeolu.sl.jmh;
 
-import io.github.kusoroadeolu.sl.*;
+import io.github.kusoroadeolu.sl.ConcurrentCollection;
+import io.github.kusoroadeolu.sl.EliminationUnrolledConcurrentList;
+import io.github.kusoroadeolu.sl.LocalEFUnrolledConcurrentList;
+import io.github.kusoroadeolu.sl.UnrolledConcurrentList;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.profile.JavaFlightRecorderProfiler;
@@ -8,17 +11,9 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
-import java.util.List;
 import java.util.SplittableRandom;
 import java.util.concurrent.TimeUnit;
 
-@BenchmarkMode(Mode.SampleTime)
-@OutputTimeUnit(TimeUnit.MICROSECONDS)
-@Warmup(iterations = 10, time = 1)
-@Measurement(iterations = 10, time = 1)
-@Fork(3)
-@State(Scope.Benchmark)
-@Threads(8)
 
 
 /* 100% Writes
@@ -74,12 +69,30 @@ ElimUnrolledZipfianBenchmark.fullWrite              64  UNROLLED  thrpt   30  2.
 ElimUnrolledZipfianBenchmark.fullWrite             128  UNROLLED  thrpt   30  1.726 ± 0.056  ops/us
 ElimUnrolledZipfianBenchmark.fullWrite             256  UNROLLED  thrpt   30  1.863 ± 0.163  ops/us
 * */
+
+/*
+*
+* Flow - try acquire lock - otherwise spin on different indices in the arena for a node, waiting for a thread which holds
+* the lock to combine with us
+*
+* When we hold the lock, we always create a new hashset (which uses a hashmap underneath), scan the arena for waiting threads
+* and tell threads which don't belong to that specific node to retry (which in retrospect now doesnt make sense, since threads
+* backoff and we still hold the lock to the node they need to create a new node to)
+* */
+@BenchmarkMode(Mode.Throughput)
+@OutputTimeUnit(TimeUnit.MICROSECONDS)
+@Warmup(iterations = 10, time = 1)
+@Measurement(iterations = 10, time = 1)
+@Fork(1)
+@State(Scope.Benchmark)
+@Threads(8)
+
 public class ZipfianBenchmark {
 
-    @Param({"64", "128", "256"})
+    @Param({"128", "256", "512"})
     int keySpaceSize;
 
-    @Param({"ELIM_UNROLLED", "UNROLLED", "LOCAL_EF"})
+    @Param({"UNROLLED", "ELIM_UNROLLED", "LOCAL_EF"})
     private String type;
 
     private ConcurrentCollection<Integer> set;
@@ -108,12 +121,8 @@ public class ZipfianBenchmark {
 
     @TearDown
     public void teardown() {
-        List<Integer> ls = set.toList();
-        for (int i : ls) {
-            set.remove(i);
-        }
-
-        ls.clear();
+        System.out.println(set);
+        set.clear();
     }
 
     @Setup(Level.Trial)
@@ -128,15 +137,17 @@ public class ZipfianBenchmark {
     }
 
 
-    @Benchmark
-    public void eightyWriteTwentyRead(ThreadState ts, Blackhole bh) {
-        op(set, ts, bh);
-    }
+//    @Benchmark
+//    public void eightyWriteTwentyRead(ThreadState ts, Blackhole bh) {
+//        op(set, ts, bh);
+//    }
 
     @Benchmark
     public void fullWrite(ThreadState ts, Blackhole bh) {
         fullWrite(set, ts, bh);
     }
+
+
 
 
     private void op(ConcurrentCollection<Integer> set, ThreadState ts, Blackhole bh) {
@@ -151,7 +162,7 @@ public class ZipfianBenchmark {
 
     private void fullWrite(ConcurrentCollection<Integer> set, ThreadState ts, Blackhole bh) {
         int key = zipf.nextInt(ts.rng);
-        if (ts.rng.nextDouble(1) < 0.5) bh.consume(set.add(key));
+        if (ts.rng.nextBoolean()) bh.consume(set.add(key));
         else bh.consume(set.remove(key));
     }
 
@@ -188,7 +199,7 @@ public class ZipfianBenchmark {
         static void main() throws RunnerException {
             Options options = new OptionsBuilder()
                     .include(ZipfianBenchmark.class.getSimpleName())
-                    .addProfiler(JavaFlightRecorderProfiler.class, "dir=C:\\jfr-sl")
+                    .addProfiler(JavaFlightRecorderProfiler.class, "dir=C:\\jfr-sl-1")
                     .build();
             new org.openjdk.jmh.runner.Runner(options).run();        }
     }
@@ -257,4 +268,45 @@ Generated with JMHPretty
 ╰───────────────────────────────────────────────────────────────────────────────────────╯
 Generated with JMHPretty
 
+* */
+
+/*
+* Bad run 1
+* {
+* 0=[0],
+* 1=[79, 38, 76, 68, 3, 48, 69, 22, 81, 47, 44, 65, 45, 29, 50, 56, 8, 11, 13, 62, 59, 85, 15, 1, 54, 18, 72, 25, 53, 70, 80, 33, 71, 67, 64, 49, 60, 74, 77, 24],
+* 89=[127, 146, 97, 142, 105, 139, 123, 103, 116, 111, 91, 148, 126, 95, 144, 128, 90, 130, 143, 113, 141, 133, 93, 101, 132, 89, 134, 136, 99, 106, 138, 112, 94, 100, 117, 98, 129, 121, 114],
+* 151=[187, 190, 184, 208, 169, 180, 204, 167, 178, 183, 159, 166, 172, 206, 175, 152, 162, 188, 157, 181, 197, 191, 193, 154, 182, 202, 195, 176, 209],
+* 211=[222, 218, 249, 246, 240, 225, 238, 255, 212, 216, 230, 244, 245, 226, 214, 227, 229, 235]
+* }
+*
+* {
+* 1=[26, 9, 71, 85, 45, 53, 17, 70, 76, 4, 8, 65, 12, 32, 6, 7, 58, 60, 46, 13, 81, 1, 24, 21, 37, 80, 86, 30, 51, 27, 22, 47, 20, 40, 29, 73, 68, 82, 59, 50, 44, 54],
+* 89=[121, 115, 141, 103, 137, 111, 118, 113, 152, 90, 153, 93, 98, 154, 123, 157, 96, 149, 144, 101, 128, 146, 129, 155, 89, 102, 117, 130, 133],
+* 158=[249, 169, 212, 228, 190, 192, 226, 176, 180, 185, 177, 208, 227, 207, 248, 168, 206, 239, 238, 235, 175, 171, 205, 204, 231, 181, 202, 193, 243, 214, 203, 220, 165, 196, 183, 223, 211, 209, 250, 245, 246, 233, 198, 167, 158, 234, 242, 189, 166, 247, 178, 161, 187, 236, 252]
+* }
+*
+*
+* Good run 1
+*
+* {
+* 0=[48, 46, 52, 0, 5, 22, 49, 34, 74, 36, 20, 61, 26, 64, 38, 11, 8, 44, 6, 16, 37, 54, 25, 4, 27, 28, 32, 43, 10, 50, 29, 55, 67, 39, 53, 82, 31, 65, 57, 71],
+* 83=[84, 140, 142, 122, 86, 125, 143, 119, 85, 114, 88, 156, 107, 158, 153, 87, 160, 124, 128, 129, 92, 159, 93, 120, 118, 94, 135, 147, 104, 95, 100, 103, 148, 155, 109, 136, 91, 99, 151, 133, 127, 145, 115, 97],
+* 161=[199, 184, 190, 206, 163, 203, 179, 194, 176, 204, 230, 182, 213, 201, 165, 239, 210, 196, 229, 178, 250, 170, 200, 220, 255, 231, 205, 251, 227, 197, 232, 225, 175, 246, 224, 222, 168, 164, 248, 172, 209, 193, 245, 185, 214, 169]
+* }
+*
+* Good run 2
+*
+* {
+* 0=[71, 3, 15, 5, 0, 70, 35, 33, 20, 10, 16, 18, 12, 42, 30, 7, 48, 45, 39, 72, 63, 65, 67, 66, 9, 13, 28, 8, 11, 40, 74, 68, 43, 23, 61, 77, 44, 27, 46, 73, 21, 41],
+* 78=[132, 151, 89, 81, 114, 115, 127, 83, 78, 111, 94, 130, 122, 147, 98, 117, 97, 153, 143, 116, 106, 146, 107, 123, 120, 135, 108, 112, 88, 95, 104, 105, 90, 141, 110, 102, 85, 134],
+* 159=[195, 177, 247, 230, 170, 232, 172, 181, 243, 204, 187, 223, 160, 221, 213, 186, 194, 207, 173, 228, 234, 229, 212, 178, 180, 224, 179, 220, 184, 169, 244, 219, 246, 176, 233, 163, 248, 239, 159, 198, 210, 174, 226, 168, 164, 203, 206, 185, 190]
+* }
+*
+* Base unrolled
+* {
+* 0=[37, 39, 29, 16, 45, 12, 41, 1, 7, 0, 13, 2, 50, 42, 75, 18, 35, 65, 43, 66, 34, 36, 64, 27, 74, 32, 57, 69, 54, 61, 17, 47, 55, 51, 30, 38, 56, 19, 58, 25, 49, 14, 44, 63, 9, 40, 24, 8],
+* 76=[107, 132, 102, 124, 110, 89, 98, 122, 148, 86, 125, 91, 95, 104, 76, 139, 80, 83, 147, 133, 100, 155, 82, 94, 136, 93, 88, 130, 115, 151, 113, 150, 128, 109, 79, 84, 117, 131, 146, 143, 101],
+* 156=[200, 184, 193, 212, 194, 195, 248, 245, 209, 242, 198, 173, 255, 166, 188, 216, 172, 185, 219, 201, 183, 170, 156, 222, 158, 175, 246, 162, 250, 211, 180, 221, 226, 240, 238, 176, 207, 181, 231, 230, 196, 239, 210, 213, 252, 237, 177, 233, 161, 199, 204, 160]
+* }
 * */

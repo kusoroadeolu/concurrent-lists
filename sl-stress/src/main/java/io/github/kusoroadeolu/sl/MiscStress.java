@@ -2,11 +2,13 @@ package io.github.kusoroadeolu.sl;
 
 import org.openjdk.jcstress.annotations.*;
 import org.openjdk.jcstress.infra.results.III_Result;
-import org.openjdk.jcstress.infra.results.II_Result;
 
 import java.lang.invoke.VarHandle;
 import java.util.concurrent.atomic.AtomicIntegerArray;
-import java.util.concurrent.locks.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.openjdk.jcstress.annotations.Expect.ACCEPTABLE;
 import static org.openjdk.jcstress.annotations.Expect.ACCEPTABLE_INTERESTING;

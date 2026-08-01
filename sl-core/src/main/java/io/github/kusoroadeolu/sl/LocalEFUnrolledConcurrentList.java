@@ -23,7 +23,16 @@ import static io.github.kusoroadeolu.sl.UnrolledConcurrentList.filterNulls;
 * 2. The combining request's operation matches that of the combining thread
 * 3. The request's operation(specifically in add) respects the anchor invariant from the parent unrolled concurrent list class
 *
-* This class maintains the set invariant. I do believe the combining path might incur some overhead and perform worse than its base class
+* To prevent threads with values which do not belong to a certain node from spinning aimlessly on the exchange arena (which caused persistent cpu and latency drops), as
+* ideally no thread with their value will match with them (in that node), we simply make that thread wait for the lock to that specific node
+* rather than trying to hold the lock then waiting in the arena
+*
+* This simple change, from profiling,
+*  shows waiting in the arena had the majority cpu samples
+* seems to have cut the cpu samples from ~2k to ~900, which is still a lot but magnitudes better
+
+ * This class maintains the set invariant. I do believe the combining path might incur some overhead and perform worse than its base class
+*
 * */
 /**
  * @author kusoroadeolu
@@ -75,12 +84,17 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
             var pred = nodes[0];
             var curr = nodes[1];
             if (curr.contains(value)) return false;
-
-            if (pred.tryLock()) {
+            //true, hold the lock(because we are dont actually belong in this node),
+            //boolean held;
+            // otherwise try or await exchange
+            boolean belongsToNode = belongsToNode(r, curr, value);
+            boolean held;
+            if ((held = pred.tryLock()) || !belongsToNode) {
+                if (!held) pred.lock(); //if we didnt hold the lock and wait, try await
                 try {
                     if (isNotValid(pred, curr) || curr.containsPlain(value)) return false;
 
-                    if (curr == r || value.compareTo(curr.anchor) < 0) { //Don't scan if this is the right node
+                    if (!belongsToNode) { //Don't scan if this is the right node
                         LocalEFNode<T> n = new LocalEFNode<>(value, aCap);
 
                         //pred - n - curr
@@ -143,6 +157,9 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
                  //We want to publish then wait
                 if (ours == null) ours = new CombiningRequest<>(Operation.ADD,  value);
 
+                if (belongsToNode) ++la.nodeExists;
+                else ++la.nodeDoesntExist;
+
                 if (nodes[1] != r && awaitExchange(ours, nodes, curr.arena, (int) Thread.currentThread().threadId())) {
                     Boolean status = awaitStatus(ours);
                     if (status != null) return status;
@@ -154,6 +171,10 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
     void assertInvariants(LocalEFNode<T> pred, LocalEFNode<T> node, LocalEFNode<T> curr) {
         boolean invariant = (pred == left || node.anchor.compareTo(pred.anchor) >= 0) && (curr == right || node.anchor.compareTo(curr.anchor) < 0);
         if (!invariant) throw new RuntimeException("Error on initial add");
+    }
+
+    boolean belongsToNode(LocalEFNode<T> r, LocalEFNode<T> curr, T value) {
+      return  curr != r && value.compareTo(curr.anchor) >= 0;
     }
 
 
@@ -171,15 +192,17 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
             var pred = nodes[0];
             var curr = nodes[1];
             if (!curr.contains(t)) return false;
+            boolean belongsToNode = belongsToNode(r, curr, t);
 
-            if (curr == r || curr.anchor.compareTo(t) > 0) return false;
+            if (!belongsToNode) return false;
+
             if (ours == null) ours = new CombiningRequest<>(Operation.REMOVE, t);
 
             if (pred.tryLock()) {
                 try {
                     if (isNotValid(pred, curr) || !curr.containsPlain(t)) return false;
                     int size = curr.size();
-                    Map<T, CombiningRequest<T>> valuesToBeRemoved = new HashMap<>();
+                    HashMap<T, CombiningRequest<T>> valuesToBeRemoved = new HashMap<>();
                     valuesToBeRemoved.put(t, ours);
                     scanAndMatchRemove(valuesToBeRemoved, nodes);
 
@@ -491,6 +514,23 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
         return map;
     }
 
+    public String toString() {
+        return nodeMap().toString();
+    }
+
+    public int nodeExistsCount() {
+        return localArrays.get().nodeExists;
+    }
+
+    public int nodeDoesntExistCount() {
+        return localArrays.get().nodeDoesntExist;
+    }
+
+    public void reset() {
+        localArrays.get().nodeExists = 0;
+        localArrays.get().nodeDoesntExist = 0;
+    }
+
     private static final Object FREE = null;
 
 
@@ -713,6 +753,8 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
         }
     }
 
+
+
     static class SentinelEFNode<T extends Comparable<T>> extends LocalEFNode<T> {
         public SentinelEFNode() {
             super(null, 0, fillArena());
@@ -728,6 +770,9 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
         final LocalEFNode<T>[] nodes; //0 - pred, 1 - curr
         //Used for storing indices to prevent extra traversals to calculate size;
         final int[] indices; // 0 - index, 1 - size
+
+        int nodeExists;
+        int nodeDoesntExist;
 
         public LocalArrays() {
             this.nodes = new LocalEFNode[2];
@@ -762,3 +807,130 @@ public class LocalEFUnrolledConcurrentList<T extends Comparable<T>> implements C
         }
     }
 }
+
+
+/*
+* Notes
+* I'm investigating a massive performance (throughput and latency) drop on this structure
+* which occurs at random when running the Zipfian Benchmark on a tight key space at 8 threads
+*
+* This benchmark measures if contention on locks (due to a tight key space) significantly affects the base
+* unrolled list and if the intra node concurrency measures alleviate contention (if it exists)
+*
+* I got isolated JFR profile data for both a good run and a bad run (when the perf drop occurs)
+*
+* So far, the method samples for both don't exactly differ in data, a high percentage of cpu samples are packed
+* at the await exchange method, which shows a lot of threads wait in the fc arena awaiting combining
+*
+* Memory samples showed a different picture though
+For both the good and the bad run, a lot of memory ~1.2GB was allocated just due to resizing a hashmap. Which is an issue
+* since hashmaps are allocated frequently on the write path
+*
+* However, the bad run showed a lot of memory allocation for creating new nodes
+* Which could point to the fact that values are sparsely allocated across nodes, meaning more nodes, less values in nodes and more pointer chases
+* or nodes are getting emptied pretty quickly, needing for more nodes to be created or tbh a combination of both
+* There is barely any activity on the split, merge, redistribute path for both the base unrolled and this structure (on both runs) which justifies both of my hypothesis
+* This could be due to an unfortunate order of values entering the array
+*
+*
+* However, if this was the issue, the base unrolled will be facing this issue; which it doesn't, it has barely no allocation on the write path
+* given that it actually doesn't try to increase intra node concurrency
+*
+* To dig deeper, I checked the GC events
+* In the good and bad runs, the GC pause times were pretty similar, however the bad run had ~3x less GCs than the good run
+* All GCs happened in the young generation. No GCs occurred in the old generation for both
+*
+* The bad run had up to ~5x weak references and ~2x phantom references than the good run (~550 & ~25), compared to (~120 & ~10)
+*
+* The base unrolled list has 0 weak or phantom refs, which does make sense especially since it doesn't allocate any references
+* on the write path(until creation, redistribution, split) of a node,
+* compared this structure which allocates
+* 1. A combining request 2. A hash map(if a thread holds the lock; this is a bit worse especially since resizing hashmaps seems to allocate a lot of memory)
+* on every write operation 3. An arena (on node creation)
+*
+* The gc numbers seem interesting but I think they might be an issue later but not the cause of this specific issue, as we can clearly see that this doesn't occur on the base unrolled
+* list. This moves my focus to the combining arena and its logic, specifically the add flow
+*
+* I think the next plausible step might be to view the structure of
+* 1. The base unrolled
+* 2. This structure (on a good run)
+* 3. This structure (on a bad run)
+* after a fork
+*
+* After viewing the structure of all these (2 runs, 2 structures, to prevent bias)
+* I expected to see a degenerate unrolled linked list (for the bad run), however, this wasnt the case
+* The unrolled linked list was packed similar to the base and good run
+*
+* To make this deterministic. This seems to only occur in tight keyspaces when threads are evenly subscribed to their processor count
+* and when the number of nodes in the structure >= 3. At a keyspace of 64, this scenario never occurred. I did notice a deep here
+* but it seemed pretty natural at 128 this scenario only occurred when the number of nodes in the structure >= 3, given that normally
+* this keyspace only housed 2 nodes at 256 this scenario only occured when the number of nodes in the structure >= 3, though normally this
+* keyspace houses 3 nodes.
+*
+* One thing I noticed for bad runs is that during warmup, the numbers start off strong, dip, then never recover. Which might point to that unlucky
+* sequence of numbers, not just in the way you'd expect
+* I do have a hypothesis that this dip seems to occur when values that belong to a node that doesnt exist yet, so they keep spinning and retrying until they
+* actually unlock the lock. I will test this hypothesis though through aux counters
+*
+*
+* Mainly the control experiment will be how does the thrpt scale when the number of threads whose value don't belong to a node before they enter the combining arena.
+*
+This will be run with those deterministic factors, especially on the 256 keyspace, with other factors intact, as its easier to replicate the issue like this
+This is specifically on the "add" path since removes short circuit if we fail to find a node a value belongs to for removal
+*
+* * Benchmark                                        (keySpaceSize)    (type)   Mode  Cnt  Score   Error   Units
+LocalEFIsolationBench.fullWrite                             256  LOCAL_EF  thrpt   10  4.815 ± 0.244  ops/us
+LocalEFIsolationBench.fullWrite:nodeDoesntExist             256  LOCAL_EF  thrpt   10    ≈ 0          ops/us
+LocalEFIsolationBench.fullWrite:nodeExists                  256  LOCAL_EF  thrpt   10  1.832 ± 0.079  ops/us
+
+* Benchmark                                        (keySpaceSize)    (type)   Mode  Cnt  Score   Error   Units
+LocalEFIsolationBench.fullWrite                             256  LOCAL_EF  thrpt   10  0.793 ± 0.135  ops/us
+LocalEFIsolationBench.fullWrite:nodeDoesntExist             256  LOCAL_EF  thrpt   10  0.076 ± 0.013  ops/us
+LocalEFIsolationBench.fullWrite:nodeExists                  256  LOCAL_EF  thrpt   10  0.886 ± 0.049  ops/us
+*
+* From the hypothesis run, we can see that my intuition was correct. Thrpt doesnt degrade when and only when threads entering the elim arena
+* hold values whose nodes already exists. Once a thread whose value doesnt fit in any particular present node, thrpt degrades rapidly
+* This doesn't exactly mean a thread's value will be combined with, however it does significantly increase the chance of combining
+*
+* On a larger keyspace, this hypothesis proves to be true as well
+* * Benchmark                                        (keySpaceSize)    (type)   Mode  Cnt  Score   Error   Units
+LocalEFIsolationBench.fullWrite                           10000  LOCAL_EF  thrpt   10  1.489 ± 0.206  ops/us
+LocalEFIsolationBench.fullWrite:nodeDoesntExist           10000  LOCAL_EF  thrpt   10  0.143 ± 0.020  ops/us
+LocalEFIsolationBench.fullWrite:nodeExists                10000  LOCAL_EF  thrpt   10  0.631 ± 0.035  ops/us
+*
+* Benchmark                                        (keySpaceSize)    (type)   Mode  Cnt  Score   Error   Units
+LocalEFIsolationBench.fullWrite                           10000  LOCAL_EF  thrpt   10  4.337 ± 0.229  ops/us
+LocalEFIsolationBench.fullWrite:nodeDoesntExist           10000  LOCAL_EF  thrpt   10    ≈ 0          ops/us
+LocalEFIsolationBench.fullWrite:nodeExists                10000  LOCAL_EF  thrpt   10  1.657 ± 0.112  ops/us
+*
+*
+* From the numbers 10% of the values in the elim arena from the run didn't belong in any specific present nodes, hence just wasting cpu cycles in a tight loop in the arena
+since they wouldnt get combined. Another issue is that these threads could act as "parasites" per say, as they could prevent valid threads from actually registering
+their value in the arena, hence negating the arena's value.
+*
+* The simplest way to fix this is to force threads whose values won't fit in any current specific node to wait on the lock to the predecessor node, rather than
+* wasting cycles while doing no work in the arena. That's what I'll be testing next
+*
+* Note that this change doesnt exactly get rid of the root issue, cause that can't be done, rather it ensures threads who have no chance of matching
+* values in an elim arena don't bother trying, hence getting rid of the two issues I mentioned earlier
+*
+* Benchmark                                        (keySpaceSize)    (type)   Mode  Cnt  Score   Error   Units
+LocalEFIsolationBench.fullWrite                             256  LOCAL_EF  thrpt   10  2.396 ± 0.092  ops/us
+LocalEFIsolationBench.fullWrite:nodeDoesntExist             256  LOCAL_EF  thrpt   10    ≈ 0          ops/us
+LocalEFIsolationBench.fullWrite:nodeExists                  256  LOCAL_EF  thrpt   10  0.081 ± 0.013  ops/us
+*
+* Benchmark                                        (keySpaceSize)    (type)   Mode  Cnt  Score   Error   Units
+LocalEFIsolationBench.fullWrite                             256  LOCAL_EF  thrpt   10  4.705 ± 0.286  ops/us
+LocalEFIsolationBench.fullWrite:nodeDoesntExist             256  LOCAL_EF  thrpt   10    ≈ 0          ops/us
+LocalEFIsolationBench.fullWrite:nodeExists                  256  LOCAL_EF  thrpt   10  1.726 ± 0.126  ops/us
+
+*
+* The lower bound thrpt has improved massively, with a tighter error margin though at the cost of some thrpt.
+* is much better than thrpt that degrades poorly under those "unpredictable" factors I mentioned earlier
+*
+* Also from these numbers its pretty obvious thrpt scales with the factor of a node existing and degrades with the factor
+* a node doesnt exist.
+*
+* The next thing I plan to look at though is that hashmap resize issue, but its probably an issue for another day
+*
+* */

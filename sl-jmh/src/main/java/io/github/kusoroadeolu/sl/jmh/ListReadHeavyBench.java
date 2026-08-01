@@ -8,7 +8,6 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
-import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
@@ -67,12 +66,7 @@ public class ListReadHeavyBench {
 
     @TearDown
     public void teardown() {
-        List<Integer> ls = set.toList();
-        for (int i : ls) {
-            set.remove(i);
-        }
-
-        ls.clear();
+        set.clear();
     }
 
 

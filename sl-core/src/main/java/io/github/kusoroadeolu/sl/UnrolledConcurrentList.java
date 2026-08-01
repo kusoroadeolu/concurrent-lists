@@ -443,6 +443,10 @@ public class UnrolledConcurrentList<T extends Comparable<T>> implements Concurre
         nodes[0] = pred; nodes[1] = curr;
     }
 
+    public String toString() {
+        return nodeMap().toString();
+    }
+
 
 
     //Indice 0 -> index of value, Indice 1 -> size

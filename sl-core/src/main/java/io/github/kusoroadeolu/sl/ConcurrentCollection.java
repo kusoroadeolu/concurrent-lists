@@ -54,7 +54,12 @@ public interface ConcurrentCollection<T> extends Collection<T> {
 
     @Override
     default void clear() {
+        List<T> ls = toList();
+        for (T t : ls) {
+            remove(t);
+        }
 
+        ls.clear();
     }
 
 }
